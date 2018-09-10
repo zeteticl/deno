@@ -260,6 +260,31 @@ Fetch API:
 fetch(input?: Request | string, init?: RequestInit): Promise<Response>;
 ```
 
+Echo TCP Server:
+```ts
+import * as deno from "deno";
+
+const listener = deno.listen("tcp", ":8080");
+for (;;) {
+  const conn = await listener.accept();
+  deno.copy(conn, conn);
+}
+```
+
+HTTP Server:
+```ts
+import * as deno from "deno";
+const enc = new TextEncoder();
+function handler(w: deno.HTTPResponseWriter, r: deno.HTTPRequest) {
+  let ab = enc.encode(`hello ${r.url.path}`);
+  w.write(ab);
+}
+deno.httpServe(":8080", handler);
+```
+`w` and `r` implement the `deno.Writer` and `deno.Reader` interfaes
+respectively.
+
+
 #### I/O
 
 There are many OS constructs that perform I/O: files, sockets, pipes.
