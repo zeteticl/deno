@@ -70,9 +70,17 @@ TEST(LibDenoTest, SendNoCallback) {
   deno_delete(d);
 }
 
+void assert_null(deno_buf b) {
+  EXPECT_EQ(b.alloc_ptr, nullptr);
+  EXPECT_EQ(b.alloc_len, 0u);
+  EXPECT_EQ(b.data_ptr, nullptr);
+  EXPECT_EQ(b.data_len, 0u);
+}
+
 TEST(LibDenoTest, RecvReturnEmpty) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto _, auto buf) {
+  Deno* d = deno_new(nullptr, [](auto _, auto buf, auto mbuf) {
+    assert_null(mbuf);
     count++;
     EXPECT_EQ(static_cast<size_t>(3), buf.data_len);
     EXPECT_EQ(buf.data_ptr[0], 'a');
@@ -86,7 +94,8 @@ TEST(LibDenoTest, RecvReturnEmpty) {
 
 TEST(LibDenoTest, RecvReturnBar) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto deno, auto buf) {
+  Deno* d = deno_new(nullptr, [](auto deno, auto buf, auto mbuf) {
+    assert_null(mbuf);
     count++;
     EXPECT_EQ(static_cast<size_t>(3), buf.data_len);
     EXPECT_EQ(buf.data_ptr[0], 'a');
@@ -107,7 +116,8 @@ TEST(LibDenoTest, DoubleRecvFails) {
 
 TEST(LibDenoTest, SendRecvSlice) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto deno, auto buf) {
+  Deno* d = deno_new(nullptr, [](auto deno, auto buf, auto mbuf) {
+    assert_null(mbuf);
     static const size_t alloc_len = 1024;
     size_t i = count++;
     // Check the size and offset of the slice.
@@ -139,7 +149,8 @@ TEST(LibDenoTest, SendRecvSlice) {
 
 TEST(LibDenoTest, JSSendArrayBufferViewTypes) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto _, auto buf) {
+  Deno* d = deno_new(nullptr, [](auto _, auto buf, auto mbuf) {
+    assert_null(mbuf);
     count++;
     size_t data_offset = buf.data_ptr - buf.alloc_ptr;
     EXPECT_EQ(data_offset, 2468u);
@@ -154,7 +165,8 @@ TEST(LibDenoTest, JSSendArrayBufferViewTypes) {
 
 TEST(LibDenoTest, JSSendNeutersBuffer) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto _, auto buf) {
+  Deno* d = deno_new(nullptr, [](auto _, auto buf, auto mbuf) {
+    assert_null(mbuf);
     count++;
     EXPECT_EQ(buf.data_len, 1u);
     EXPECT_EQ(buf.data_ptr[0], 42);
@@ -178,7 +190,8 @@ TEST(LibDenoTest, SnapshotBug) {
 
 TEST(LibDenoTest, GlobalErrorHandling) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto _, auto buf) {
+  Deno* d = deno_new(nullptr, [](auto _, auto buf, auto mbuf) {
+    assert_null(mbuf);
     count++;
     EXPECT_EQ(static_cast<size_t>(1), buf.data_len);
     EXPECT_EQ(buf.data_ptr[0], 42);
@@ -196,12 +209,34 @@ TEST(LibDenoTest, DoubleGlobalErrorHandlingFails) {
 
 TEST(LibDenoTest, SendNullAllocPtr) {
   static int count = 0;
-  Deno* d = deno_new(nullptr, [](auto _, auto buf) { count++; });
+  Deno* d = deno_new(nullptr, [](auto _, auto buf, auto mbuf) { count++; });
   EXPECT_TRUE(deno_execute(d, "a.js", "SendNullAllocPtr()"));
   deno_buf buf = StrBufNullAllocPtr("abcd");
   EXPECT_EQ(buf.alloc_ptr, nullptr);
   EXPECT_EQ(buf.data_len, 4u);
   EXPECT_TRUE(deno_send(d, buf));
   EXPECT_EQ(count, 0);
+  deno_delete(d);
+}
+
+TEST(LibDenoTest, SendSecondBuf) {
+  static int count = 0;
+  static deno_buf mbuf_copy;
+  Deno* d = deno_new(nullptr, [](auto _, deno_buf buf, deno_buf mbuf) {
+    count++;
+    mbuf.data_ptr[0] = 4;
+    mbuf.data_ptr[1] = 2;
+    mbuf_copy = mbuf;
+    EXPECT_EQ(2u, buf.data_len);
+    EXPECT_EQ(2u, mbuf.data_len);
+    EXPECT_EQ(buf.data_ptr[0], 1);
+    EXPECT_EQ(buf.data_ptr[1], 2);
+  });
+  EXPECT_TRUE(deno_execute(d, "a.js", "SendSecondBuf()"));
+  EXPECT_EQ(count, 1);
+  // mbuf was subsequently changed in JS, let's check that our copy reflects
+  // that.
+  EXPECT_EQ(mbuf_copy.data_ptr[0], 9);
+  EXPECT_EQ(mbuf_copy.data_ptr[1], 8);
   deno_delete(d);
 }

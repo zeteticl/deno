@@ -22,7 +22,8 @@ typedef struct deno_s Deno;
 
 // A callback to receive a message from deno.send javascript call.
 // buf is valid only for the lifetime of the call.
-typedef void (*deno_recv_cb)(Deno* d, deno_buf buf);
+// external_buf is valid
+typedef void (*deno_recv_cb)(Deno* d, deno_buf buf, deno_buf mbuf);
 
 void deno_init();
 const char* deno_v8_version();

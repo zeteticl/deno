@@ -168,6 +168,18 @@ static v8::Local<v8::Uint8Array> ImportBuf(v8::Isolate* isolate, deno_buf buf) {
   }
 }
 
+static deno_buf GetContentsBuf(v8::Isolate* isolate,
+                               v8::Local<v8::ArrayBufferView> view) {
+  auto ab = view->Buffer();
+  auto contents = ab->GetContents();
+  deno_buf buf;
+  buf.alloc_ptr = nullptr;
+  buf.alloc_len = 0u;
+  buf.data_ptr = reinterpret_cast<uint8_t*>(contents.Data());
+  buf.data_len = contents.ByteLength();
+  return buf;
+}
+
 static deno_buf ExportBuf(v8::Isolate* isolate,
                           v8::Local<v8::ArrayBufferView> view) {
   auto ab = view->Buffer();
@@ -215,15 +227,22 @@ void Send(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Locker locker(d->isolate);
   v8::EscapableHandleScope handle_scope(isolate);
 
-  CHECK_EQ(args.Length(), 1);
   v8::Local<v8::Value> ab_v = args[0];
   CHECK(ab_v->IsArrayBufferView());
-  auto buf = ExportBuf(isolate, v8::Local<v8::ArrayBufferView>::Cast(ab_v));
+  deno_buf buf = ExportBuf(isolate, v8::Local<v8::ArrayBufferView>::Cast(ab_v));
+  deno_buf mbuf;
+  if (args.Length() == 2) {
+    v8::Local<v8::Value> ab2_v = args[1];
+    mbuf = GetContentsBuf(isolate, v8::Local<v8::ArrayBufferView>::Cast(ab2_v));
+  } else {
+    mbuf = {nullptr, 0u, nullptr, 0u};
+    CHECK_EQ(args.Length(), 1);
+  }
 
   DCHECK_EQ(d->currentArgs, nullptr);
   d->currentArgs = &args;
 
-  d->cb(d, buf);
+  d->cb(d, buf, mbuf);
 
   // Buffer is only valid until the end of the callback.
   // TODO(piscisaureus):
