@@ -4,6 +4,7 @@
 import "./compiler_test.ts";
 import "./console_test.ts";
 import "./fetch_test.ts";
+import "./file_test.ts";
 import "./os_test.ts";
 import "./read_file_test.ts";
 import "./write_file_test.ts";

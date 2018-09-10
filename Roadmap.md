@@ -260,7 +260,7 @@ Fetch API:
 fetch(input?: Request | string, init?: RequestInit): Promise<Response>;
 ```
 
-Echo TCP Server:
+#### Echo TCP Server:
 ```ts
 import * as deno from "deno";
 
@@ -271,18 +271,35 @@ for (;;) {
 }
 ```
 
-HTTP Server:
+#### HTTP Server:
+
 ```ts
 import * as deno from "deno";
 const enc = new TextEncoder();
-function handler(w: deno.HTTPResponseWriter, r: deno.HTTPRequest) {
-  let ab = enc.encode(`hello ${r.url.path}`);
+function handler(req: deno.HTTPRequest, res: deno.HTTPResponse) {
+  let ab = enc.encode(`hello ${req.url.path}`);
   w.write(ab);
 }
 deno.httpServe(":8080", handler);
 ```
-`w` and `r` implement the `deno.Writer` and `deno.Reader` interfaes
+`req.body` and `res` implement the `deno.Reader` and `deno.Writer` interfaces
 respectively.
+
+#### File I/O:
+
+Open a new file called `cat.ts` and copy this in:
+```ts
+import * as deno from "deno";
+for (let i = 1; i < deno.argv.length; i++) {
+  let filename = deno.argv[i];
+  let file = await deno.open(filename);
+  await deno.copy(deno.stdout, file);
+}
+```
+Now try out your new utility
+```
+> deno cat.ts /etc/passwd
+```
 
 
 #### I/O

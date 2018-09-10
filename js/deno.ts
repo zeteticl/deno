@@ -11,6 +11,17 @@ export {
   lstatSync
 } from "./os";
 export { mkdirSync, mkdir } from "./mkdir";
+export {
+  Reader,
+  ReadResult,
+  Writer,
+  Closer,
+  Seeker,
+  ReaderCloser,
+  ReadWriteCloser,
+  copy
+} from "./io";
+export { File, open, close, read, write, stdin, stdout, stderr } from "./file";
 export { readFileSync, readFile } from "./read_file";
 export { writeFileSync, writeFile } from "./write_file";
 export { ErrorKind, DenoError } from "./errors";

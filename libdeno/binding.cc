@@ -233,7 +233,10 @@ void Send(const v8::FunctionCallbackInfo<v8::Value>& args) {
   deno_buf mbuf;
   if (args.Length() == 2) {
     v8::Local<v8::Value> ab2_v = args[1];
-    mbuf = GetContentsBuf(isolate, v8::Local<v8::ArrayBufferView>::Cast(ab2_v));
+    if (ab2_v->IsArrayBufferView()) {
+      mbuf =
+          GetContentsBuf(isolate, v8::Local<v8::ArrayBufferView>::Cast(ab2_v));
+    }
   } else {
     mbuf = {nullptr, 0u, nullptr, 0u};
     CHECK_EQ(args.Length(), 1);

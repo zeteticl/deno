@@ -8,7 +8,7 @@
 
 ## A secure TypeScript runtime built on V8
 
-* Supports TypeScript 3.0.1 out of the box. Uses V8 6.9.297. That is, it's
+* Supports TypeScript 3 out of the box. Uses V8 7.0, it's
   very modern JavaScript.
 
 * No `package.json`. No npm. Not explicitly compatible with Node.
@@ -55,7 +55,30 @@
 ```
 curl -sSf https://raw.githubusercontent.com/denoland/deno_install/master/install.py | python
 ```
-
+If everything went well you should have `$HOME/.deno/bin/deno` installed on your
+computer. Add a line like this to your `~/.bash_profile`:
+```
+export PATH=$HOME/.deno/bin:$PATH
+```
+Now you can try it:
+```
+> deno --version
+deno: 0.1.3
+v8: 7.0.247-deno
+```
+Open a new file called `cat.ts` and copy this in:
+```ts
+import * as deno from "deno";
+for (let i = 1; i < deno.argv.length; i++) {
+  let filename = deno.argv[i];
+  let file = await deno.open(filename);
+  await deno.copy(deno.stdout, file);
+}
+```
+Now try out your new utility
+```
+> deno cat.ts /etc/passwd
+```
 
 ## Status
 

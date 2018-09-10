@@ -56,6 +56,7 @@ pub extern "C" fn msg_from_js(d: *const DenoC, buf: deno_buf) {
     msg::Any::StatSync => handle_stat_sync,
     msg::Any::WriteFile => handle_write_file,
     msg::Any::Exit => handle_exit,
+    msg::Any::Open => handle_open,
     _ => panic!(format!(
       "Unhandled message {}",
       msg::enum_name_any(msg_type)
@@ -606,4 +607,39 @@ fn handle_rename_sync(d: *const DenoC, base: &msg::Base) -> Box<Op> {
     fs::rename(Path::new(&oldpath), Path::new(&newpath))?;
     Ok(None)
   }()))
+}
+
+fn handle_open(_d: *const DenoC, base: &msg::Base) -> Box<Op> {
+  let msg = base.msg_as_open().unwrap();
+  let cmd_id = base.cmd_id();
+  let filename = msg.filename().unwrap();
+  let p = Path::new(filename);
+
+  let mut options = tokio::fs::OpenOptions::new();
+  let future = options.read(true).open(p);
+
+  /*
+    let vec = fs::read(Path::new(&filename))?;
+    // Build the response message. memcpy data into msg.
+    // TODO(ry) zero-copy.
+    let builder = &mut FlatBufferBuilder::new();
+    let data_off = builder.create_vector(vec.as_slice());
+    let msg = msg::OpenRes::create(
+      builder,
+      &msg::OpenResResArgs {
+        fd,
+        ..Default::default()
+      },
+    );
+    Ok(serialize_response(
+      cmd_id,
+      builder,
+      msg::BaseArgs {
+        msg: Some(msg.as_union_value()),
+        msg_type: msg::Any::ReadFileRes,
+        ..Default::default()
+      },
+    ))
+  }()))
+  */
 }

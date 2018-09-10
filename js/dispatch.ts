@@ -27,9 +27,10 @@ export function handleAsyncMsgFromRust(ui8: Uint8Array) {
 export function sendAsync(
   builder: flatbuffers.Builder,
   msgType: fbs.Any,
-  msg: flatbuffers.Offset
+  msg: flatbuffers.Offset,
+  mbuf?: ArrayBufferView
 ): Promise<fbs.Base> {
-  const [cmdId, resBuf] = sendInternal(builder, msgType, msg, false);
+  const [cmdId, resBuf] = sendInternal(builder, msgType, msg, false, mbuf);
   util.assert(resBuf == null);
   const promise = util.createResolvable<fbs.Base>();
   promiseTable.set(cmdId, promise);
@@ -60,7 +61,8 @@ function sendInternal(
   builder: flatbuffers.Builder,
   msgType: fbs.Any,
   msg: flatbuffers.Offset,
-  sync = true
+  sync = true,
+  mbuf?: ArrayBufferView
 ): [number, null | Uint8Array] {
   const cmdId = nextCmdId++;
   fbs.Base.startBase(builder);
@@ -70,5 +72,5 @@ function sendInternal(
   fbs.Base.addCmdId(builder, cmdId);
   builder.finish(fbs.Base.endBase(builder));
 
-  return [cmdId, libdeno.send(builder.asUint8Array())];
+  return [cmdId, libdeno.send(builder.asUint8Array(), mbuf)];
 }

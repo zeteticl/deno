@@ -22,6 +22,13 @@ union Any {
   StatSync,
   StatSyncRes,
   SetEnv,
+  Open,
+  OpenRes,
+  Read,
+  ReadRes,
+  Write,
+  WriteRes,
+  Close,
 }
 
 enum ErrorKind: byte {
@@ -205,6 +212,44 @@ table StatSyncRes {
   modified:ulong;
   accessed:ulong;
   created:ulong;
+}
+
+table WriteFileSync {
+  filename: string;
+  data: [ubyte];
+  perm: uint;
+  // perm specified by https://godoc.org/os#FileMode
+}
+
+table Open {
+  filename: string;
+  perm: uint;
+}
+
+table OpenRes {
+  fd: int;
+}
+
+table Read {
+  fd: int;
+  nbyte: uint;
+}
+
+table ReadRes {
+  nread: uint;
+  eof: bool;
+}
+
+table Write {
+  fd: int;
+}
+
+table WriteRes {
+  nbyte: uint;
+}
+
+table Close {
+  fd: int;
 }
 
 root_type Base;
