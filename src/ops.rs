@@ -2,6 +2,7 @@
 use errors;
 use errors::{DenoError, DenoResult, ErrorKind};
 use fs as deno_fs;
+use http_server;
 use http_util;
 use isolate::Buf;
 use isolate::Isolate;
@@ -85,15 +86,17 @@ pub fn dispatch(
       msg::Any::Environ => op_env,
       msg::Any::Exit => op_exit,
       msg::Any::Fetch => op_fetch,
+      msg::Any::HttpAccept => op_http_accept,
+      msg::Any::HttpListen => op_http_listen,
       msg::Any::Listen => op_listen,
       msg::Any::MakeTempDir => op_make_temp_dir,
       msg::Any::Metrics => op_metrics,
       msg::Any::Mkdir => op_mkdir,
       msg::Any::Open => op_open,
+      msg::Any::Read => op_read,
       msg::Any::ReadDir => op_read_dir,
       msg::Any::ReadFile => op_read_file,
       msg::Any::Readlink => op_read_link,
-      msg::Any::Read => op_read,
       msg::Any::Remove => op_remove,
       msg::Any::Rename => op_rename,
       msg::Any::Resources => op_resources,
@@ -103,8 +106,8 @@ pub fn dispatch(
       msg::Any::Stat => op_stat,
       msg::Any::Symlink => op_symlink,
       msg::Any::Truncate => op_truncate,
-      msg::Any::WriteFile => op_write_file,
       msg::Any::Write => op_write,
+      msg::Any::WriteFile => op_write_file,
       _ => panic!(format!(
         "Unhandled message {}",
         msg::enum_name_any(inner_type)
@@ -1131,6 +1134,86 @@ fn op_truncate(
   })
 }
 
+fn op_http_listen(
+  state: Arc<IsolateState>,
+  base: &msg::Base,
+  data: &'static mut [u8],
+) -> Box<Op> {
+  let cmd_id = base.cmd_id();
+  assert_eq!(data.len(), 0);
+
+  let inner = base.inner_as_http_listen().unwrap();
+  let address = inner.address().unwrap();
+
+  if let Err(e) = state.check_net(address) {
+    return odd_future(e);
+  }
+
+  Box::new(futures::future::result((move || {
+    // TODO properly parse addr
+    let addr = SocketAddr::from_str(address).unwrap();
+
+    let _server = http_server::create_and_bind(&addr).unwrap();
+    // tokio_util::spawn(server_fut);
+    //tokio::spawn(server_fut);
+
+    let rid = 42;
+    //let resource = resources::add_http_server(server);
+
+    let builder = &mut FlatBufferBuilder::new();
+    let inner = msg::HttpListenRes::create(
+      builder,
+      &msg::HttpListenResArgs {
+        rid: rid,
+        ..Default::default()
+      },
+    );
+    Ok(serialize_response(
+      cmd_id,
+      builder,
+      msg::BaseArgs {
+        inner: Some(inner.as_union_value()),
+        inner_type: msg::Any::HttpListenRes,
+        ..Default::default()
+      },
+    ))
+  })()))
+}
+
+fn op_http_accept(
+  state: Arc<IsolateState>,
+  base: &msg::Base,
+  data: &'static mut [u8],
+) -> Box<Op> {
+  assert_eq!(data.len(), 0);
+
+  if let Err(e) = state.check_net("accept") {
+    return odd_future(e);
+  }
+
+  let cmd_id = base.cmd_id();
+  let inner = base.inner_as_http_accept().unwrap();
+  let _listener_rid = inner.listener_rid();
+
+  let builder = &mut FlatBufferBuilder::new();
+  let inner = msg::HttpAcceptRes::create(
+    builder,
+    &msg::HttpAcceptResArgs {
+      transaction_rid: 43,
+      ..Default::default()
+    },
+  );
+  ok_future(serialize_response(
+    cmd_id,
+    builder,
+    msg::BaseArgs {
+      inner: Some(inner.as_union_value()),
+      inner_type: msg::Any::HttpAcceptRes,
+      ..Default::default()
+    },
+  ))
+}
+
 fn op_listen(
   state: Arc<IsolateState>,
   base: &msg::Base,
@@ -1143,9 +1226,9 @@ fn op_listen(
 
   let cmd_id = base.cmd_id();
   let inner = base.inner_as_listen().unwrap();
+  let address = inner.address().unwrap();
   let network = inner.network().unwrap();
   assert_eq!(network, "tcp");
-  let address = inner.address().unwrap();
 
   Box::new(futures::future::result((move || {
     // TODO properly parse addr

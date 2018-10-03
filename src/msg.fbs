@@ -49,6 +49,11 @@ union Any {
   CwdRes,
   Metrics,
   MetricsRes,
+  HttpListen,
+  HttpListenRes,
+  HttpAccept,
+  HttpAcceptRes,
+  HttpWriteResponse,
 }
 
 enum ErrorKind: byte {
@@ -381,6 +386,46 @@ table MetricsRes {
   bytes_sent_control: uint64;
   bytes_sent_data: uint64;
   bytes_received: uint64;
+}
+
+table HttpListen {
+  address: string;
+}
+
+table HttpListenRes {
+  rid: int;
+}
+
+table HttpAccept {
+  listener_rid: int;
+}
+
+table HttpAcceptRes {
+  transaction_rid: int;
+  headers: HttpHeaders;
+}
+
+// Can include "data" message for body.
+// Issue further body chunks using Write and transaction_id.
+// Must issue Close with transaction_id when done with response, even if
+// content-length is zero (that is, there is no body).
+// Must be called before any Write on transaction_id.
+table HttpWriteResponse {
+  transaction_rid: int;
+  headers: HttpHeaders;
+}
+
+table HttpHeaders {
+  is_request: bool;
+  // Request only:
+  method: string;
+  url: string;
+  // Response only:
+  status: int;
+  status_text: string;
+  // Both:
+  fields: [string];
+  values: [string];
 }
 
 root_type Base;

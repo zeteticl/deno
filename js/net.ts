@@ -6,7 +6,7 @@ import * as dispatch from "./dispatch";
 import * as flatbuffers from "./flatbuffers";
 import { read, write, close } from "./files";
 
-export type Network = "tcp";
+export type Network = "tcp" | "http";
 // TODO support other types:
 // export type Network = "tcp" | "tcp4" | "tcp6" | "unix" | "unixpacket";
 
@@ -15,6 +15,9 @@ export type Addr = string;
 
 /** A Listener is a generic network listener for stream-oriented protocols. */
 export interface Listener {
+  /** Resource id for this listener. AKA file descriptor. */
+  readonly rid: number;
+
   /** Waits for and resolves to the next connection to the `Listener`. */
   accept(): Promise<Conn>;
 

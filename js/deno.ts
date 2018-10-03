@@ -30,6 +30,7 @@ export { readDirSync, readDir } from "./read_dir";
 export { copyFileSync, copyFile } from "./copy_file";
 export { readlinkSync, readlink } from "./read_link";
 export { statSync, lstatSync, stat, lstat } from "./stat";
+export { httpServe, httpListen } from "./http";
 export { symlinkSync, symlink } from "./symlink";
 export { writeFileSync, writeFile } from "./write_file";
 export { ErrorKind, DenoError } from "./errors";
