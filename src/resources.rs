@@ -192,6 +192,8 @@ pub fn lookup(rid: ResourceId) -> Option<Resource> {
 
 use futures::future::Either;
 use futures::future::FutureResult;
+//use futures::Future;
+//use futures::Async;
 
 type EagerRead<R, T> =
   Either<tokio_io::io::Read<R, T>, FutureResult<(R, T, usize), std::io::Error>>;
@@ -209,6 +211,23 @@ where
         if cfg!(windows) {
           Either::A(tokio_io::io::read(resource, buf))
         } else {
+          /*
+          let r = tcp_stream.poll_read(buf.as_mut());
+          match r {
+            Ok(Async::Ready(nread)) => {
+              println!("read bytes {}", nread);
+              Either::B(futures::future::ok((resource, buf, nread)))
+            },
+            Ok(Async::NotReady) => {
+              println!("not read");
+              Either::A(tokio_io::io::read(resource, buf))
+            },
+            Err(e) => {
+              println!("err {}", e);
+              Either::B(futures::future::err(e))
+            }
+          }
+          */
           // Unforunately we can't just call read() on tokio::net::TcpStream
           // TODO Unlock table?
           use std::os::unix::io::AsRawFd;

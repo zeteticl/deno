@@ -665,6 +665,7 @@ fn op_read(
   match resources::lookup(rid) {
     None => odd_future(errors::bad_resource()),
     Some(resource) => {
+      println!("eager read");
       let op = resources::eager_read(resource, data)
         .map_err(|err| DenoError::from(err))
         .and_then(move |(_resource, _buf, nread)| {
