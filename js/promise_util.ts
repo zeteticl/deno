@@ -15,6 +15,7 @@ export function promiseRejectHandler(
   /* tslint:disable-next-line:no-any */
   promise: Promise<any>
 ) {
+  console.log("promiseRejectHandler", event);
   switch (event) {
     case "RejectWithNoHandler":
       rejectMap.set(promise, (error as Error).stack || "RejectWithNoHandler");

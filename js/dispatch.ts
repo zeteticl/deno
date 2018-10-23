@@ -44,10 +44,11 @@ export function sendAsync(
   data?: ArrayBufferView
 ): Promise<msg.Base> {
   maybePushTrace(innerType, false); // add to trace if tracing
-  const [cmdId, resBuf] = sendInternal(builder, innerType, inner, data, false);
-  util.assert(resBuf == null);
+  const cmdId = nextCmdId++;
   const promise = util.createResolvable<msg.Base>();
   promiseTable.set(cmdId, promise);
+  const resBuf = sendInternal(cmdId, builder, innerType, inner, data, false);
+  util.assert(resBuf == null);
   return promise;
 }
 
@@ -59,7 +60,8 @@ export function sendSync(
   data?: ArrayBufferView
 ): null | msg.Base {
   maybePushTrace(innerType, true); // add to trace if tracing
-  const [cmdId, resBuf] = sendInternal(builder, innerType, inner, data, true);
+  const cmdId = nextCmdId++;
+  const resBuf = sendInternal(cmdId, builder, innerType, inner, data, true);
   util.assert(cmdId >= 0);
   if (resBuf == null) {
     return null;
@@ -73,13 +75,13 @@ export function sendSync(
 }
 
 function sendInternal(
+  cmdId: number,
   builder: flatbuffers.Builder,
   innerType: msg.Any,
   inner: flatbuffers.Offset,
   data: undefined | ArrayBufferView,
   sync = true
-): [number, null | Uint8Array] {
-  const cmdId = nextCmdId++;
+): null | Uint8Array {
   msg.Base.startBase(builder);
   msg.Base.addInner(builder, inner);
   msg.Base.addInnerType(builder, innerType);
@@ -88,5 +90,5 @@ function sendInternal(
   builder.finish(msg.Base.endBase(builder));
   const res = libdeno.send(builder.asUint8Array(), data);
   builder.inUse = false;
-  return [cmdId, res];
+  return res;
 }

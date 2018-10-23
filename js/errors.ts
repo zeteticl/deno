@@ -35,6 +35,7 @@ export function maybeError(base: Base): null | DenoError<ErrorKind> {
   if (kind === ErrorKind.NoError) {
     return null;
   } else {
+    console.log("maybeError innerType cmdId", base.innerType(), base.cmdId());
     return new DenoError(kind, base.error()!);
   }
 }
