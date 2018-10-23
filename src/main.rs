@@ -73,9 +73,9 @@ fn main() {
     eprintln!("{}", err);
     std::process::exit(1)
   });
-  let mut isolate = isolate::Isolate::new(flags, rest_argv, ops::dispatch);
-  flags::process(&isolate.state.flags);
-  tokio_util::init(|| {
+  tokio::run(futures::future::lazy(|| {
+    let mut isolate = isolate::Isolate::new(flags, rest_argv, ops::dispatch);
+    flags::process(&isolate.state.flags);
     isolate
       .execute("deno_main.js", "denoMain();")
       .unwrap_or_else(|err| {
@@ -83,5 +83,6 @@ fn main() {
         std::process::exit(1);
       });
     isolate.event_loop();
-  });
+    Ok(())
+  }));
 }

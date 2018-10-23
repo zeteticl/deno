@@ -9,8 +9,6 @@
 // handlers) look up resources by their integer id here.
 
 use errors::DenoError;
-use tokio_util;
-use tokio_write;
 
 use futures;
 use futures::Poll;

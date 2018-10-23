@@ -11,7 +11,10 @@ use msg;
 use resources;
 use resources::Resource;
 use version;
+use tokio_write;
+use tokio_util;
 
+use tokio_io;
 use flatbuffers::FlatBufferBuilder;
 use futures;
 use futures::future::poll_fn;
@@ -47,6 +50,15 @@ type OpCreator =
 // Hopefully Rust optimizes this away.
 fn empty_buf() -> Buf {
   Box::new([])
+}
+
+use futures::Async;
+fn eager_poll(mut f: Box<Op>) -> Box<Op> {
+  match f.poll() {
+    Ok(Async::Ready(msg)) => ok_future(msg),
+    Ok(Async::NotReady) => f,
+    Err(e) => odd_future(e),
+  }
 }
 
 /// Processes raw messages from JavaScript.
@@ -109,6 +121,8 @@ pub fn dispatch(
     };
     op_creator(isolate.state.clone(), &base, data)
   };
+
+  let op = eager_poll(op);
 
   let boxed_op = Box::new(
     op.or_else(move |err: DenoError| -> DenoResult<Buf> {
@@ -702,7 +716,7 @@ fn op_write(
   match resources::lookup(rid) {
     None => odd_future(errors::bad_resource()),
     Some(resource) => {
-      let op = resources::eager_write(resource, data)
+      let op = tokio_write::write(resource, data)
         .map_err(|err| DenoError::from(err))
         .and_then(move |(_resource, _buf, nwritten)| {
           let builder = &mut FlatBufferBuilder::new();
@@ -1185,7 +1199,7 @@ fn op_accept(
   match resources::lookup(server_rid) {
     None => odd_future(errors::bad_resource()),
     Some(server_resource) => {
-      let op = resources::eager_accept(server_resource)
+      let op = tokio_util::accept(server_resource)
         .map_err(|err| DenoError::from(err))
         .and_then(move |(tcp_stream, _socket_addr)| {
           new_conn(cmd_id, tcp_stream)

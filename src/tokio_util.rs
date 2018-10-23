@@ -25,6 +25,7 @@ where
 // Set the default executor so we can use tokio::spawn(). It's difficult to
 // pass around mut references to the runtime, so using with_default is
 // preferable. Ideally Tokio would provide this function.
+#[allow(dead_code)]
 pub fn init<F>(f: F)
 where
   F: FnOnce(),
