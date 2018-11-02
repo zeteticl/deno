@@ -86,6 +86,7 @@ function createEnv(inner: msg.EnvironRes): { [index: string]: string } {
 
   for (let i = 0; i < inner.mapLength(); i++) {
     const item = inner.map(i)!;
+
     env[item.key()!] = item.value()!;
   }
 
