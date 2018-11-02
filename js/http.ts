@@ -6,6 +6,7 @@ import { assert } from "./util";
 import * as dispatch from "./dispatch";
 import * as flatbuffers from "./flatbuffers";
 import { close } from "./files";
+import * as domTypes from "./dom_types";
 
 type HttpHandler = (req: {}, res: {}) => void;
 
@@ -18,11 +19,11 @@ export class HttpServer implements Closer {
   }
 
   async serve(): Promise<void> {
-    //while (this.closing === false) {
-    let t = await httpAccept(this.rid);
-    console.log("accepted http connection", t.rid);
-    console.log("closing", this.closing);
-    //}
+    while (this.closing === false) {
+      let t = await httpAccept(this.rid);
+      console.log("accepted http connection", t.rid);
+      console.log("closing", this.closing);
+    }
   }
 
   close(): void {
@@ -38,11 +39,37 @@ export function httpServe(address: string, handler: HttpHandler): HttpServer {
   return s;
 }
 
+function headersParse(m: msg.HttpHeaders): Array<[string, string]> {
+  const env: { [index: string]: string } = {};
+
+  for (let i = 0; i < m.fields(); i++) {
+    const item = _inner.map(i)!;
+
+    env[item.key()!] = item.value()!;
+  }
+}
+
+class FbsHeaders implements domTypes.Headers {
+  constructor(m: msg.HttpHeaders) {}
+
+  append(name: string, value: string): void;
+  delete(name: string): void;
+  entries(): IterableIterator<[string, string]>;
+  get(name: string): string | null;
+  has(name: string): boolean;
+}
+
 class Transaction {
   rid: number;
   constructor(httpAcceptRes: msg.HttpAcceptRes) {
     this.rid = httpAcceptRes.transactionRid();
-    assert(this.rid > 2);
+    //assert(this.rid > 2);
+
+    let headers = httpAcceptRes.headers()!;
+    console.log("headers", headers);
+
+    let h = reqHeadersParse(headers);
+    console.log("h", h);
   }
 }
 

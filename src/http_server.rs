@@ -58,7 +58,6 @@ pub fn create_and_bind(addr: &SocketAddr) -> DenoResult<HttpServer> {
     req_msg_sender.send(req_msg).unwrap();
     Ok(())
   });
-  tokio::spawn(loop_fut);
 
   let new_service = move || {
     // Yes, this is oddly necessary. Attempts to remove it end in tears.
@@ -78,6 +77,8 @@ pub fn create_and_bind(addr: &SocketAddr) -> DenoResult<HttpServer> {
   let builder = Server::try_bind(&addr)?;
   let fut = builder.serve(new_service);
   let fut = fut.map_err(|err| panic!(err));
+
+  tokio::spawn(loop_fut);
   tokio::spawn(fut);
 
   let http_server = HttpServer { sender_a, sender_b };

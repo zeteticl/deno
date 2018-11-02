@@ -1204,8 +1204,8 @@ fn new_req(cmd_id: u32, tcp_stream: TcpStream) -> OpResult {
 }
     */
 
-use hyper::Body;
-use hyper::Response;
+//use hyper::Body;
+//use hyper::Response;
 //use http_server::HttpServer;
 fn op_http_accept(
   state: Arc<IsolateState>,
@@ -1224,14 +1224,18 @@ fn op_http_accept(
 
   let op =
     resources::http_accept(listener_rid).map(move |(req, response_tx)| {
-      assert_eq!(req.uri(), "/foo");
       assert!(response_tx.is_canceled() == false);
-      response_tx.send(Response::new(Body::from("hi\n"))).unwrap();
+
+      //response_tx.send(Response::new(Body::from("hi\n"))).unwrap();
 
       let builder = &mut FlatBufferBuilder::new();
+
+      let headers = http_util::serialize_request(builder, &req);
+
       let inner = msg::HttpAcceptRes::create(
         builder,
         &msg::HttpAcceptResArgs {
+          headers: Some(headers),
           ..Default::default()
         },
       );

@@ -190,7 +190,8 @@ table EnvironRes {
   map: [KeyValue];
 }
 
-table KeyValue {
+// TODO Rename to KeyValue
+table EnvPair {
   key: string;
   value: string;
 }
