@@ -1153,18 +1153,16 @@ fn op_http_listen(
     // TODO properly parse addr
     let addr = SocketAddr::from_str(address).unwrap();
 
-    let _server = http_server::create_and_bind(&addr).unwrap();
+    let http_server = http_server::create_and_bind(&addr).unwrap();
+    let resource = resources::add_http_server(http_server);
     // tokio_util::spawn(server_fut);
     //tokio::spawn(server_fut);
-
-    let rid = 42;
-    //let resource = resources::add_http_server(server);
 
     let builder = &mut FlatBufferBuilder::new();
     let inner = msg::HttpListenRes::create(
       builder,
       &msg::HttpListenResArgs {
-        rid: rid,
+        rid: resource.rid,
         ..Default::default()
       },
     );
@@ -1180,6 +1178,32 @@ fn op_http_listen(
   })()))
 }
 
+    /*
+fn new_req(cmd_id: u32, tcp_stream: TcpStream) -> OpResult {
+  unimplemented!()
+  let tcp_stream_resource = resources::add_tcp_stream(tcp_stream);
+  // TODO forward socket_addr to client.
+
+  let builder = &mut FlatBufferBuilder::new();
+  let inner = msg::HttpAcceptRes::create(
+    builder,
+    &msg::HttpAcceptResArgs {
+      rid: tcp_stream_resource.rid,
+      ..Default::default()
+    },
+  );
+  Ok(serialize_response(
+    cmd_id,
+    builder,
+    msg::BaseArgs {
+      inner: Some(inner.as_union_value()),
+      inner_type: msg::Any::HttpAcceptRes,
+      ..Default::default()
+    },
+  ))
+}
+    */
+
 fn op_http_accept(
   state: Arc<IsolateState>,
   base: &msg::Base,
@@ -1191,27 +1215,24 @@ fn op_http_accept(
     return odd_future(e);
   }
 
-  let cmd_id = base.cmd_id();
+  let _cmd_id = base.cmd_id();
   let inner = base.inner_as_http_accept().unwrap();
-  let _listener_rid = inner.listener_rid();
+  let listener_rid = inner.listener_rid();
 
-  let builder = &mut FlatBufferBuilder::new();
-  let inner = msg::HttpAcceptRes::create(
-    builder,
-    &msg::HttpAcceptResArgs {
-      transaction_rid: 43,
-      ..Default::default()
-    },
-  );
-  ok_future(serialize_response(
-    cmd_id,
-    builder,
-    msg::BaseArgs {
-      inner: Some(inner.as_union_value()),
-      inner_type: msg::Any::HttpAcceptRes,
-      ..Default::default()
-    },
-  ))
+  match resources::lookup(listener_rid) {
+    None => odd_future(errors::bad_resource()),
+    Some(server_resource) => {
+      let _op = resources::http_accept(server_resource)
+        .map_err(|err| DenoError::from(err));
+        /*
+        .and_then(move |(tcp_stream, _socket_addr)| {
+          unimplemented!()
+          //new_req(cmd_id, tcp_stream)
+        });
+        */
+      unimplemented!()
+    }
+  }
 }
 
 fn op_listen(
