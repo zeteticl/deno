@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+use errors::DenoError;
+use errors::DenoResult;
 use http_util;
 use tokio_util;
 
@@ -8,6 +10,7 @@ use futures::future::lazy;
 use futures::future::result;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
+use futures::Canceled;
 use futures::Sink;
 use hyper;
 use hyper::rt::{Future, Stream};
@@ -22,30 +25,53 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use tokio;
 
+pub type Res = Response<Body>;
+
+// server -> loop
+pub type ReqMsg = (Request<Body>, oneshot::Sender<Res>);
+
+// accept -> loop
+pub type ReqMsgSender = oneshot::Sender<ReqMsg>;
+
 pub struct HttpServer {
-  //pub fut: hyper::Server<AddrIncoming, ()>,
-  pub server_rx: mpsc::Receiver<ReqMsg>,
+  sender_a: mpsc::Sender<ReqMsgSender>,
+  sender_b: mpsc::Sender<ReqMsg>,
 }
 
-type ReqMsg = (Request<Body>, oneshot::Sender<Response<Body>>);
+impl HttpServer {
+  pub fn accept(&self) -> impl Future<Item = ReqMsg, Error = DenoError> {
+    let (req_msg_sender, req_msg_reciever) = oneshot::channel::<ReqMsg>();
+    let tx = self.sender_a.clone();
+    tx.send(req_msg_sender)
+      .map_err(|e| DenoError::from(e))
+      .and_then(|_| req_msg_reciever.map_err(|e| DenoError::from(e)))
+  }
+}
 
-pub fn create_and_bind(addr: &SocketAddr) -> hyper::error::Result<HttpServer> {
-  let (server_tx, server_rx) = mpsc::channel::<ReqMsg>(2);
+pub fn create_and_bind(addr: &SocketAddr) -> DenoResult<HttpServer> {
+  let (sender_a, loop_rx) = mpsc::channel::<ReqMsgSender>(1);
+  let (sender_b, loop2_rx) = mpsc::channel::<ReqMsg>(1);
+
+  let sender_b2 = sender_b.clone();
+
+  let loop_fut = loop_rx.zip(loop2_rx).for_each(|(req_msg_sender, req_msg)| {
+    req_msg_sender.send(req_msg).unwrap();
+    Ok(())
+  });
+  tokio::spawn(loop_fut);
 
   let new_service = move || {
-    let server_tx2 = Box::new(server_tx.clone());
+    // Yes, this is oddly necessary. Attempts to remove it end in tears.
+    let sender_b3 = sender_b2.clone();
+
     service_fn(move |req: Request<Body>| {
-      let server_tx3 = server_tx2.clone();
-      let (tx, rx) = oneshot::channel::<Response<Body>>();
-      let rx = Box::new(rx);
-      let msg = (req, tx);
-      assert!(server_tx3.is_closed() == false);
-      server_tx3
-        .send(msg)
-        .map_err(|err| {
-          println!("server_tx.send error {}", err);
-          panic!(err)
-        }).and_then(|_| rx)
+      let (res_send, res_recv) = oneshot::channel::<Res>();
+      // Clone necessary here too.
+      sender_b3
+        .clone()
+        .send((req, res_send))
+        .map_err(|e| DenoError::from(e))
+        .and_then(|_| res_recv.map_err(|e| DenoError::from(e)))
     })
   };
 
@@ -54,7 +80,7 @@ pub fn create_and_bind(addr: &SocketAddr) -> hyper::error::Result<HttpServer> {
   let fut = fut.map_err(|err| panic!(err));
   tokio::spawn(fut);
 
-  let http_server = HttpServer { server_rx };
+  let http_server = HttpServer { sender_a, sender_b };
 
   Ok(http_server)
 }
@@ -69,15 +95,17 @@ fn test_http_server_create() {
   tokio_util::init(|| {
     let http_server = create_and_bind(&addr).unwrap();
 
-    tokio::spawn(http_server.server_rx.for_each(move |req_msg| {
-      let (req, response_tx) = req_msg;
-      assert!(response_tx.is_canceled() == false);
-      assert_eq!(req.uri(), "/foo");
-      let r = response_tx.send(Response::new(Body::from("hi")));
-      assert!(r.is_ok());
-      req_counter_.fetch_add(1, Ordering::SeqCst);
-      result(r.map_err(|err| panic!(err)))
-    }));
+    let accept_fut = http_server
+      .accept()
+      .map(move |(req, response_tx)| {
+        assert_eq!(req.uri(), "/foo");
+        assert!(response_tx.is_canceled() == false);
+        let r = response_tx.send(Response::new(Body::from("hi")));
+        assert!(r.is_ok());
+        req_counter_.fetch_add(1, Ordering::SeqCst);
+        ()
+      }).map_err(|e| panic!(e));
+    tokio::spawn(accept_fut);
 
     let r = http_util::fetch_sync_string("http://127.0.0.1:4500/foo");
     assert!(r.is_ok());

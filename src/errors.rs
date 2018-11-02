@@ -149,6 +149,26 @@ impl From<hyper::Error> for DenoError {
   }
 }
 
+use futures::sync::mpsc::SendError;
+impl<T> From<SendError<T>> for DenoError {
+  #[inline]
+  fn from(_err: SendError<T>) -> DenoError {
+    DenoError {
+      repr: Repr::Simple(ErrorKind::Other, String::from("Send Error")),
+    }
+  }
+}
+
+use futures::Canceled;
+impl From<Canceled> for DenoError {
+  #[inline]
+  fn from(_err: Canceled) -> DenoError {
+    DenoError {
+      repr: Repr::Simple(ErrorKind::Other, String::from("Future Canceled")),
+    }
+  }
+}
+
 pub fn bad_resource() -> DenoError {
   new(ErrorKind::BadResource, String::from("bad resource id"))
 }

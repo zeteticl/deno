@@ -1178,7 +1178,7 @@ fn op_http_listen(
   })()))
 }
 
-    /*
+/*
 fn new_req(cmd_id: u32, tcp_stream: TcpStream) -> OpResult {
   unimplemented!()
   let tcp_stream_resource = resources::add_tcp_stream(tcp_stream);
@@ -1204,6 +1204,9 @@ fn new_req(cmd_id: u32, tcp_stream: TcpStream) -> OpResult {
 }
     */
 
+use hyper::Body;
+use hyper::Response;
+//use http_server::HttpServer;
 fn op_http_accept(
   state: Arc<IsolateState>,
   base: &msg::Base,
@@ -1215,24 +1218,34 @@ fn op_http_accept(
     return odd_future(e);
   }
 
-  let _cmd_id = base.cmd_id();
+  let cmd_id = base.cmd_id();
   let inner = base.inner_as_http_accept().unwrap();
   let listener_rid = inner.listener_rid();
 
-  match resources::lookup(listener_rid) {
-    None => odd_future(errors::bad_resource()),
-    Some(server_resource) => {
-      let _op = resources::http_accept(server_resource)
-        .map_err(|err| DenoError::from(err));
-        /*
-        .and_then(move |(tcp_stream, _socket_addr)| {
-          unimplemented!()
-          //new_req(cmd_id, tcp_stream)
-        });
-        */
-      unimplemented!()
-    }
-  }
+  let op =
+    resources::http_accept(listener_rid).map(move |(req, response_tx)| {
+      assert_eq!(req.uri(), "/foo");
+      assert!(response_tx.is_canceled() == false);
+      response_tx.send(Response::new(Body::from("hi\n"))).unwrap();
+
+      let builder = &mut FlatBufferBuilder::new();
+      let inner = msg::HttpAcceptRes::create(
+        builder,
+        &msg::HttpAcceptResArgs {
+          ..Default::default()
+        },
+      );
+      serialize_response(
+        cmd_id,
+        builder,
+        msg::BaseArgs {
+          inner: Some(inner.as_union_value()),
+          inner_type: msg::Any::HttpAcceptRes,
+          ..Default::default()
+        },
+      )
+    });
+  Box::new(op)
 }
 
 fn op_listen(

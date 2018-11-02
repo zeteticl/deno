@@ -11,12 +11,14 @@
 #[cfg(unix)]
 use eager_unix as eager;
 use errors::DenoError;
+use http_server;
+use http_server::HttpServer;
 use tokio_util;
 use tokio_write;
-use http_server;
 
 use futures;
 use futures::future::{Either, FutureResult};
+use futures::Future;
 use futures::Poll;
 use std;
 use std::collections::HashMap;
@@ -57,7 +59,7 @@ enum Repr {
   FsFile(tokio::fs::File),
   TcpListener(tokio::net::TcpListener),
   TcpStream(tokio::net::TcpStream),
-  HttpServer(http_server::HttpServer),
+  HttpServer(HttpServer),
 }
 
 pub fn table_entries() -> Vec<(i32, String)> {
@@ -222,12 +224,24 @@ pub fn add_tcp_stream(stream: tokio::net::TcpStream) -> Resource {
   Resource { rid }
 }
 
-pub fn add_http_server(s: http_server::HttpServer) -> Resource {
+pub fn add_http_server(s: HttpServer) -> Resource {
   let rid = new_rid();
   let mut tg = RESOURCE_TABLE.lock().unwrap();
   match tg.insert(rid, Repr::HttpServer(s)) {
     Some(_) => panic!("There is already a file with that rid"),
     None => Resource { rid },
+  }
+}
+
+use errors::bad_resource;
+pub fn http_accept(
+  rid: ResourceId,
+) -> impl Future<Item = http_server::ReqMsg, Error = DenoError> {
+  let mut table = RESOURCE_TABLE.lock().unwrap();
+  let maybe_repr = table.get_mut(&rid);
+  match maybe_repr {
+    Some(Repr::HttpServer(ref mut s)) => Either::A(s.accept()),
+    _ => Either::B(futures::future::err(bad_resource())),
   }
 }
 
@@ -320,21 +334,6 @@ pub fn eager_accept(resource: Resource) -> EagerAccept {
         eager::tcp_accept(tcp_listener, resource)
       }
       _ => Either::A(tokio_util::accept(resource)),
-    },
-  }
-}
-
-
-pub fn http_accept(resource: Resource) -> EagerAccept {
-  let mut table = RESOURCE_TABLE.lock().unwrap();
-  let maybe_repr = table.get_mut(&resource.rid);
-  match maybe_repr {
-    None => panic!("bad rid"),
-    Some(repr) => match repr {
-      Repr::HttpServer(ref mut _http_server) => {
-        unimplemented!("TODO")
-      },
-      _ => panic!("cannot http_accept this resource")
     },
   }
 }
