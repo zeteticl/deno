@@ -6,23 +6,24 @@ import { assert } from "./util";
 import * as dispatch from "./dispatch";
 import * as flatbuffers from "./flatbuffers";
 import { close } from "./files";
-//import * as domTypes from "./dom_types";
+import * as domTypes from "./dom_types";
 
-type HttpHandler = (req: {}, res: {}) => void;
+import * as fetch from "./fetch";
+
+type HttpHandler = (req: ServerRequest, res: ServerResponse) => void;
 
 export class HttpServer implements Closer {
   private closing = false;
-  handler: null | HttpHandler = null;
 
   constructor(readonly rid: number) {
     assert(rid >= 2);
   }
 
-  async serve(): Promise<void> {
+  async serve(handler: HttpHandler): Promise<void> {
     while (this.closing === false) {
-      let t = await httpAccept(this.rid);
-      console.log("accepted http connection", t.rid);
-      console.log("closing", this.closing);
+      let [req, res] = await httpAccept(this.rid);
+      console.log("accepted http connection");
+      handler(req, res);
     }
   }
 
@@ -34,12 +35,11 @@ export class HttpServer implements Closer {
 
 export function httpServe(address: string, handler: HttpHandler): HttpServer {
   const s = httpListen(address);
-  s.handler = handler;
-  s.serve();
+  s.serve(handler);
   return s;
 }
 
-function deserializeFields(m: msg.HttpHeader): Array<[string, string]> {
+function deserializeHeaderFields(m: msg.HttpHeader): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   for (let i = 0; i < m.fieldsLength(); i++) {
     const item = m.fields(i)!;
@@ -48,21 +48,93 @@ function deserializeFields(m: msg.HttpHeader): Array<[string, string]> {
   return out;
 }
 
-class Transaction {
+class ServerRequest /* TODO implements domTypes.Request */ {
   rid: number;
-  constructor(httpAcceptRes: msg.HttpAcceptRes) {
-    this.rid = httpAcceptRes.transactionRid();
-    //assert(this.rid > 2);
+  readonly method: string;
+  readonly url: string;
+  readonly headers: domTypes.Headers;
 
-    let header = httpAcceptRes.header()!;
-    console.log("headers", header);
+  /*
+  // Unsupported.
+  readonly body: domTypes.ReadableStream | null;
+  readonly cache: domTypes.RequestCache = "default";
+  readonly credentials: domTypes.RequestCredentials = "omit";
+  readonly destination: domTypes.RequestDestination = "";
+  readonly integrity: string = "";
+  readonly isHistoryNavigation: boolean = false;
+  readonly isReloadNavigation: boolean = false;
+  readonly keepalive: boolean = false;
+  readonly mode: domTypes.RequestMode = "navigate";
+  readonly redirect: domTypes.RequestRedirect;
+  readonly referrer: string;
+  readonly referrerPolicy: domTypes.ReferrerPolicy;
+  readonly signal: domTypes.AbortSignal;
+   */
 
-    let f = deserializeFields(header);
-    console.log("header fields", f);
+  constructor(m: msg.HttpAcceptRes) {
+    this.rid = m.transactionRid();
+
+    let header = m.header()!;
+    let fields = deserializeHeaderFields(header);
+    this.headers = new fetch.Headers(fields);
+    this.url = header.url()!;
+    this.method = header.method()!;
   }
+
+  /*
+  clone(): Request {
+    return notImplemented();
+  }
+
+  readonly body: domTypes.ReadableStream | null = null;
+  readonly bodyUsed: boolean = false;
+  arrayBuffer(): Promise<ArrayBuffer> {
+    return notImplemented();
+  }
+  blob(): Promise<Blob> {
+    return notImplemented();
+  }
+  formData(): Promise<FormData> {
+    return notImplemented();
+  }
+  json(): Promise<any> {
+    return notImplemented();
+  }
+  text(): Promise<string> {
+    return notImplemented();
+  }
+  */
 }
 
-async function httpAccept(rid: number): Promise<Transaction> {
+class ServerResponse /* TODO implements domTypes.Response */ {
+  rid: number;
+
+  readonly headers: domTypes.Headers;
+  /*
+  readonly ok: boolean = false;
+  readonly redirected: boolean = false;
+  readonly status: number = 500;
+  readonly statusText: string = "";
+  readonly trailer: Promise<Headers>;
+  readonly type: domTypes.ResponseType = "basic";
+  readonly url: string;
+  */
+
+  constructor(m: msg.HttpAcceptRes) {
+    this.rid = m.transactionRid();
+    this.headers = new fetch.Headers();
+  }
+
+  /*
+  clone(): domTypes.Response {
+    return notImplemented();
+  }
+  */
+}
+
+async function httpAccept(
+  rid: number
+): Promise<[ServerRequest, ServerResponse]> {
   const builder = flatbuffers.createBuilder();
   msg.HttpAccept.startHttpAccept(builder);
   msg.HttpAccept.addListenerRid(builder, rid);
@@ -70,9 +142,11 @@ async function httpAccept(rid: number): Promise<Transaction> {
   const baseRes = await dispatch.sendAsync(builder, msg.Any.HttpAccept, inner);
   assert(baseRes != null);
   assert(msg.Any.HttpAcceptRes === baseRes!.innerType());
-  const res = new msg.HttpAcceptRes();
-  assert(baseRes!.inner(res) != null);
-  return new Transaction(res);
+  const acceptResMsg = new msg.HttpAcceptRes();
+  assert(baseRes!.inner(acceptResMsg) != null);
+  let req = new ServerRequest(acceptResMsg);
+  let res = new ServerResponse(acceptResMsg);
+  return [req, res];
 }
 
 export function httpListen(address: string): HttpServer {

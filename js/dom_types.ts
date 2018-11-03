@@ -274,7 +274,7 @@ export interface Blob {
   slice(start?: number, end?: number, contentType?: string): Blob;
 }
 
-interface Body {
+export interface Body {
   /** A simple getter used to expose a `ReadableStream` of the body contents. */
   readonly body: ReadableStream | null;
   /** Stores a `Boolean` that declares whether the body has been used in a
@@ -352,7 +352,7 @@ export interface HeadersConstructor {
   prototype: Headers;
 }
 
-type RequestCache =
+export type RequestCache =
   | "default"
   | "no-store"
   | "reload"
@@ -381,7 +381,7 @@ type RequestDestination =
   | "xslt";
 type RequestMode = "navigate" | "same-origin" | "no-cors" | "cors";
 type RequestRedirect = "follow" | "error" | "manual";
-type ResponseType =
+export type ResponseType =
   | "basic"
   | "cors"
   | "default"
