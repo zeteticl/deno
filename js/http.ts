@@ -6,9 +6,8 @@ import { assert } from "./util";
 import * as dispatch from "./dispatch";
 import * as flatbuffers from "./flatbuffers";
 import { close } from "./files";
-import * as domTypes from "./dom_types";
-
-import * as fetch from "./fetch";
+//import * as headers from "./headers";
+//import * as domTypes from "./dom_types";
 
 type HttpHandler = (req: ServerRequest, res: ServerResponse) => void;
 
@@ -52,7 +51,7 @@ class ServerRequest /* TODO implements domTypes.Request */ {
   rid: number;
   readonly method: string;
   readonly url: string;
-  readonly headers: domTypes.Headers;
+  //readonly headers: domTypes.Headers;
 
   /*
   // Unsupported.
@@ -76,7 +75,8 @@ class ServerRequest /* TODO implements domTypes.Request */ {
 
     let header = m.header()!;
     let fields = deserializeHeaderFields(header);
-    this.headers = new fetch.Headers(fields);
+    console.log(fields)
+    //this.headers = new Headers(fields);
     this.url = header.url()!;
     this.method = header.method()!;
   }
@@ -109,7 +109,7 @@ class ServerRequest /* TODO implements domTypes.Request */ {
 class ServerResponse /* TODO implements domTypes.Response */ {
   rid: number;
 
-  readonly headers: domTypes.Headers;
+  //readonly headers: domTypes.Headers;
   /*
   readonly ok: boolean = false;
   readonly redirected: boolean = false;
@@ -122,7 +122,7 @@ class ServerResponse /* TODO implements domTypes.Response */ {
 
   constructor(m: msg.HttpAcceptRes) {
     this.rid = m.transactionRid();
-    this.headers = new fetch.Headers();
+    //this.headers = new headers.Headers();
   }
 
   /*
