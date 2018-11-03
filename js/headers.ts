@@ -10,7 +10,7 @@ function isHeaders(value: any): value is domTypes.Headers {
 const headerMap = Symbol("header map");
 
 // ref: https://fetch.spec.whatwg.org/#dom-headers
-class HeadersBase {
+export class HeadersBase {
   private [headerMap]: Map<string, string>;
 
   private _normalizeParams(name: string, value?: string): string[] {

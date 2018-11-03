@@ -2,12 +2,14 @@
 
 import { Closer } from "./io";
 import * as msg from "gen/msg_generated";
-import { assert } from "./util";
+import { assert, log } from "./util";
 import * as dispatch from "./dispatch";
 import * as flatbuffers from "./flatbuffers";
 import { close } from "./files";
+import { Headers } from "./headers";
+//import { HeadersBase } from "./headers";
 //import * as headers from "./headers";
-//import * as domTypes from "./dom_types";
+import * as domTypes from "./dom_types";
 
 type HttpHandler = (req: ServerRequest, res: ServerResponse) => void;
 
@@ -21,7 +23,7 @@ export class HttpServer implements Closer {
   async serve(handler: HttpHandler): Promise<void> {
     while (this.closing === false) {
       let [req, res] = await httpAccept(this.rid);
-      console.log("accepted http connection");
+      log("accepted http connection");
       handler(req, res);
     }
   }
@@ -48,10 +50,6 @@ function deserializeHeaderFields(m: msg.HttpHeader): Array<[string, string]> {
 }
 
 class ServerRequest /* TODO implements domTypes.Request */ {
-  rid: number;
-  readonly method: string;
-  readonly url: string;
-  //readonly headers: domTypes.Headers;
 
   /*
   // Unsupported.
@@ -70,15 +68,14 @@ class ServerRequest /* TODO implements domTypes.Request */ {
   readonly signal: domTypes.AbortSignal;
    */
 
-  constructor(m: msg.HttpAcceptRes) {
-    this.rid = m.transactionRid();
+  headers: domTypes.Headers;
 
-    let header = m.header()!;
-    let fields = deserializeHeaderFields(header);
-    console.log(fields)
-    //this.headers = new Headers(fields);
-    this.url = header.url()!;
-    this.method = header.method()!;
+  constructor(
+    readonly rid: number,
+    readonly method: string,
+    readonly url: string,
+    headersInit: Array<[string, string]>) {
+    this.headers = new Headers(headersInit);
   }
 
   /*
@@ -107,8 +104,6 @@ class ServerRequest /* TODO implements domTypes.Request */ {
 }
 
 class ServerResponse /* TODO implements domTypes.Response */ {
-  rid: number;
-
   //readonly headers: domTypes.Headers;
   /*
   readonly ok: boolean = false;
@@ -117,13 +112,9 @@ class ServerResponse /* TODO implements domTypes.Response */ {
   readonly statusText: string = "";
   readonly trailer: Promise<Headers>;
   readonly type: domTypes.ResponseType = "basic";
-  readonly url: string;
   */
 
-  constructor(m: msg.HttpAcceptRes) {
-    this.rid = m.transactionRid();
-    //this.headers = new headers.Headers();
-  }
+  constructor(readonly rid: number, readonly url: string) { }
 
   /*
   clone(): domTypes.Response {
@@ -144,8 +135,17 @@ async function httpAccept(
   assert(msg.Any.HttpAcceptRes === baseRes!.innerType());
   const acceptResMsg = new msg.HttpAcceptRes();
   assert(baseRes!.inner(acceptResMsg) != null);
-  let req = new ServerRequest(acceptResMsg);
-  let res = new ServerResponse(acceptResMsg);
+
+  const transactionRid = acceptResMsg.transactionRid();
+  const header = acceptResMsg.header()!;
+  const fields = deserializeHeaderFields(header);
+  const url = header.url()!;
+  const method = header.method()!;
+
+  log("http accept:", method, url, fields);
+
+  const req = new ServerRequest(transactionRid, method, url, fields);
+  const res = new ServerResponse(transactionRid, url);
   return [req, res];
 }
 
