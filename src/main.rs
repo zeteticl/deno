@@ -25,7 +25,6 @@ extern crate futures;
 
 pub mod deno_dir;
 pub mod errors;
-mod fbs_util;
 pub mod flags;
 mod fs;
 mod http_server;

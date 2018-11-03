@@ -1230,12 +1230,12 @@ fn op_http_accept(
 
       let builder = &mut FlatBufferBuilder::new();
 
-      let headers = http_util::serialize_request(builder, &req);
+      let header = msg_util::serialize_request_header(builder, &req);
 
       let inner = msg::HttpAcceptRes::create(
         builder,
         &msg::HttpAcceptResArgs {
-          headers: Some(headers),
+          header: Some(header),
           ..Default::default()
         },
       );

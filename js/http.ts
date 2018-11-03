@@ -6,7 +6,7 @@ import { assert } from "./util";
 import * as dispatch from "./dispatch";
 import * as flatbuffers from "./flatbuffers";
 import { close } from "./files";
-import * as domTypes from "./dom_types";
+//import * as domTypes from "./dom_types";
 
 type HttpHandler = (req: {}, res: {}) => void;
 
@@ -39,24 +39,13 @@ export function httpServe(address: string, handler: HttpHandler): HttpServer {
   return s;
 }
 
-function headersParse(m: msg.HttpHeaders): Array<[string, string]> {
-  const env: { [index: string]: string } = {};
-
-  for (let i = 0; i < m.fields(); i++) {
-    const item = _inner.map(i)!;
-
-    env[item.key()!] = item.value()!;
+function deserializeFields(m: msg.HttpHeader): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  for (let i = 0; i < m.fieldsLength(); i++) {
+    const item = m.fields(i)!;
+    out.push([item.key()!, item.value()!]);
   }
-}
-
-class FbsHeaders implements domTypes.Headers {
-  constructor(m: msg.HttpHeaders) {}
-
-  append(name: string, value: string): void;
-  delete(name: string): void;
-  entries(): IterableIterator<[string, string]>;
-  get(name: string): string | null;
-  has(name: string): boolean;
+  return out;
 }
 
 class Transaction {
@@ -65,11 +54,11 @@ class Transaction {
     this.rid = httpAcceptRes.transactionRid();
     //assert(this.rid > 2);
 
-    let headers = httpAcceptRes.headers()!;
-    console.log("headers", headers);
+    let header = httpAcceptRes.header()!;
+    console.log("headers", header);
 
-    let h = reqHeadersParse(headers);
-    console.log("h", h);
+    let f = deserializeFields(header);
+    console.log("header fields", f);
   }
 }
 
