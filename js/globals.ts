@@ -29,8 +29,10 @@ import { libdeno } from "./libdeno";
 declare global {
   const console: consoleTypes.Console;
   const setTimeout: typeof timers.setTimeout;
-  // tslint:disable-next-line:variable-name
+  // tslint:disable:variable-name
+  const TextDecoder: typeof textEncoding.TextDecoder;
   const TextEncoder: typeof textEncoding.TextEncoder;
+  // tslint:enable
 }
 
 // A reference to the global object.

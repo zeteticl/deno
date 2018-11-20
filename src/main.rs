@@ -95,19 +95,38 @@ fn main() {
     log::LevelFilter::Info
   });
 
-  let mut isolate = isolate::Isolate::new(
+  // TODO this feels a bit hacky, but it works
+  let rest_argv_copy = rest_argv.to_vec();
+
+  let mut compiler_isolate = isolate::Isolate::new(
+    unsafe { snapshot::compiler_snapshot.clone() },
+    flags,
+    rest_argv_copy,
+    ops::dispatch,
+  );
+  tokio_util::init(|| {
+    compiler_isolate
+      .execute("compiler_main.js", "compilerMain();")
+      .unwrap_or_else(|err| {
+        error!("{}", err);
+        std::process::exit(1);
+      });
+    compiler_isolate.event_loop();
+  });
+
+  let mut deno_isolate = isolate::Isolate::new(
     unsafe { snapshot::deno_snapshot.clone() },
     flags,
     rest_argv,
     ops::dispatch,
   );
   tokio_util::init(|| {
-    isolate
+    deno_isolate
       .execute("deno_main.js", "denoMain();")
       .unwrap_or_else(|err| {
         error!("{}", err);
         std::process::exit(1);
       });
-    isolate.event_loop();
+    deno_isolate.event_loop();
   });
 }

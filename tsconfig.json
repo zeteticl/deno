@@ -22,5 +22,5 @@
     "target": "esnext",
     "types": []
   },
-  "files": ["node_modules/typescript/lib/lib.esnext.d.ts", "js/main.ts"]
+  "files": ["node_modules/typescript/lib/lib.esnext.d.ts", "js/main.ts", "js/main_compiler.ts"]
 }

@@ -4,6 +4,14 @@ union Any {
   CodeFetch,
   CodeFetchRes,
   CodeCache,
+  CompilerStart,
+  CompilerStartRes,
+  Compilation,
+  CompilationRes,
+  ModuleFilename,
+  ModuleFilenameRes,
+  ModuleFetch,
+  ModuleFetchRes,
   SetTimeout,
   Exit,
   Environ,
@@ -168,6 +176,45 @@ table CodeCache {
   source_code: string;
   output_code: string;
   source_map: string;
+}
+
+table CompilerStart {
+  unused: int8;
+}
+
+table CompilerStartRes {
+  data: [ubyte]; // This is the source code to transpile
+  debug_flag: bool;
+  filename: string;
+  recompile_flag: bool;
+}
+
+table Compilation {
+  data: [ubyte]; // This is the output code
+  source_map: string;
+}
+
+table CompilationRes {
+  data: [ubyte]; // This is the source code to transpile
+  done: bool;
+  filename: string;
+}
+
+table ModuleFilename {
+  module_specifier: string;
+  containing_file: string;
+}
+
+table ModuleFilenameRes {
+  filename: string;
+}
+
+table ModuleFetch {
+  filename: string;
+}
+
+table ModuleFetchRes {
+  data: [ubyte];  // This is the output code
 }
 
 table Chdir {

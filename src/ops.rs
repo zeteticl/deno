@@ -84,6 +84,8 @@ pub fn dispatch(
       msg::Any::Close => op_close,
       msg::Any::CodeCache => op_code_cache,
       msg::Any::CodeFetch => op_code_fetch,
+      msg::Any::Compilation => op_compilation,
+      msg::Any::CompilerStart => op_compiler_start,
       msg::Any::CopyFile => op_copy_file,
       msg::Any::Cwd => op_cwd,
       msg::Any::Dial => op_dial,
@@ -94,6 +96,8 @@ pub fn dispatch(
       msg::Any::MakeTempDir => op_make_temp_dir,
       msg::Any::Metrics => op_metrics,
       msg::Any::Mkdir => op_mkdir,
+      // msg::Any::ModuleFilename => op_module_filename,
+      // msg::Any::ModuleFetch => op_module_fetch,
       msg::Any::Open => op_open,
       msg::Any::ReadDir => op_read_dir,
       msg::Any::ReadFile => op_read_file,
@@ -306,6 +310,72 @@ fn op_code_cache(
       .code_cache(filename, source_code, output_code, source_map)?;
     Ok(empty_buf())
   }()))
+}
+
+fn op_compiler_start(
+  state: &Arc<IsolateState>,
+  base: &msg::Base,
+  data: &'static mut [u8],
+) -> Box<Op> {
+  assert_eq!(data.len(), 0);
+  let mut builder = FlatBufferBuilder::new();
+  let filename = builder.create_string("example.ts");
+  let data_off = builder.create_vector("'source code';".as_bytes());
+
+  let inner = msg::CompilerStartRes::create(
+    &mut builder,
+    &msg::CompilerStartResArgs {
+      debug_flag: state.flags.log_debug,
+      recompile_flag: state.flags.recompile,
+      filename: Some(filename),
+      data: Some(data_off),
+      ..Default::default()
+    },
+  );
+  ok_future(serialize_response(
+    base.cmd_id(),
+    &mut builder,
+    msg::BaseArgs {
+      inner_type: msg::Any::CompilerStartRes,
+      inner: Some(inner.as_union_value()),
+      ..Default::default()
+    },
+  ))
+}
+
+fn op_compilation (
+  _state: &Arc<IsolateState>,
+  base: &msg::Base,
+  data: &'static mut [u8],
+) -> Box<Op> {
+  let inner = base.inner_as_compilation().unwrap();
+  let source_map = String::from(inner.source_map().unwrap());
+  debug!("op_compilation {} {}", source_map, data.len());
+  let mut builder = FlatBufferBuilder::new();
+  let filename = builder.create_string("example.ts");
+  let data_off = builder.create_vector("'source code';".as_bytes());
+
+  let inner = msg::CompilationRes::create(
+    &mut builder,
+    &msg::CompilationResArgs {
+      filename: Some(filename),
+      done: match source_map.as_str() {
+       "{\"count\":10}" => true,
+        _ => false,
+      },
+      data: Some(data_off),
+      ..Default::default()
+    },
+  );
+  ok_future(serialize_response(
+    base.cmd_id(),
+    &mut builder,
+    msg::BaseArgs {
+      inner_type: msg::Any::CompilationRes,
+      inner: Some(inner.as_union_value()),
+      ..Default::default()
+    },
+  ))
 }
 
 fn op_chdir(

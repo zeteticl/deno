@@ -214,7 +214,6 @@ export default function makeConfig(commandOptions) {
   return {
     output: {
       format: "iife",
-      name: "denoMain",
       sourcemap: true,
       sourcemapExcludeSources: true
     },
