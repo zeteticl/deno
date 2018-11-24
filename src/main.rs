@@ -1,8 +1,10 @@
 // Copyright 2018 the Deno authors. All rights reserved. MIT license.
+extern crate bytes;
 extern crate dirs;
 extern crate flatbuffers;
 extern crate getopts;
 extern crate http;
+extern crate httparse;
 extern crate hyper;
 extern crate hyper_rustls;
 extern crate libc;
@@ -41,6 +43,7 @@ pub mod permissions;
 mod repl;
 pub mod resources;
 pub mod snapshot;
+mod tinyhttp;
 mod tokio_util;
 mod tokio_write;
 pub mod version;
