@@ -448,4 +448,28 @@ table RunStatusRes {
   exit_signal: int;
 }
 
+table HttpWrap {
+  // Automatically closes conn_rid.
+  conn_rid: uint32;
+}
+
+table HttpWrapRes {
+  http_rid: uint32;
+}
+
+table HttpNext {
+  http_rid: uint32;
+}
+
+table HttpNextRes {
+  req_rid: uint32;
+  header: HttpHeader; // Request Header.
+}
+
+table HttpRespond {
+  req_rid: uint32;
+  header: HttpHeader; // Response Header.
+}
+
+
 root_type Base;
