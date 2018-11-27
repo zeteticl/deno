@@ -82,8 +82,8 @@ pub fn dispatch(
       msg::Any::Chdir => op_chdir,
       msg::Any::Chmod => op_chmod,
       msg::Any::Close => op_close,
-      msg::Any::CodeCache => op_code_cache,
-      msg::Any::CodeFetch => op_code_fetch,
+      // msg::Any::CodeCache => op_code_cache,
+      // msg::Any::CodeFetch => op_code_fetch,
       msg::Any::Compilation => op_compilation,
       msg::Any::CompilerStart => op_compiler_start,
       msg::Any::CopyFile => op_copy_file,
@@ -251,67 +251,67 @@ fn odd_future(err: DenoError) -> Box<Op> {
 }
 
 // https://github.com/denoland/deno/blob/golang/os.go#L100-L154
-fn op_code_fetch(
-  state: &Arc<IsolateState>,
-  base: &msg::Base,
-  data: &'static mut [u8],
-) -> Box<Op> {
-  assert_eq!(data.len(), 0);
-  let inner = base.inner_as_code_fetch().unwrap();
-  let cmd_id = base.cmd_id();
-  let module_specifier = inner.module_specifier().unwrap();
-  let containing_file = inner.containing_file().unwrap();
+// fn op_code_fetch(
+//   state: &Arc<IsolateState>,
+//   base: &msg::Base,
+//   data: &'static mut [u8],
+// ) -> Box<Op> {
+//   assert_eq!(data.len(), 0);
+//   let inner = base.inner_as_code_fetch().unwrap();
+//   let cmd_id = base.cmd_id();
+//   let module_specifier = inner.module_specifier().unwrap();
+//   let containing_file = inner.containing_file().unwrap();
 
-  assert_eq!(state.code_provider.root.join("gen"), state.code_provider.gen, "Sanity check");
+//   assert_eq!(state.code_provider.root.join("gen"), state.code_provider.gen, "Sanity check");
 
-  Box::new(futures::future::result(|| -> OpResult {
-    let builder = &mut FlatBufferBuilder::new();
-    let out = state.code_provider.code_fetch(module_specifier, containing_file)?;
-    let mut msg_args = msg::CodeFetchResArgs {
-      module_name: Some(builder.create_string(&out.module_name)),
-      filename: Some(builder.create_string(&out.filename)),
-      media_type: out.media_type,
-      source_code: Some(builder.create_string(&out.source_code)),
-      ..Default::default()
-    };
-    if let Some(ref output_code) = out.maybe_output_code {
-      msg_args.output_code = Some(builder.create_string(output_code));
-    }
-    if let Some(ref source_map) = out.maybe_source_map {
-      msg_args.source_map = Some(builder.create_string(source_map));
-    }
-    let inner = msg::CodeFetchRes::create(builder, &msg_args);
-    Ok(serialize_response(
-      cmd_id,
-      builder,
-      msg::BaseArgs {
-        inner: Some(inner.as_union_value()),
-        inner_type: msg::Any::CodeFetchRes,
-        ..Default::default()
-      },
-    ))
-  }()))
-}
+//   Box::new(futures::future::result(|| -> OpResult {
+//     let builder = &mut FlatBufferBuilder::new();
+//     let out = state.code_provider.code_fetch(module_specifier, containing_file)?;
+//     let mut msg_args = msg::CodeFetchResArgs {
+//       module_name: Some(builder.create_string(&out.module_name)),
+//       filename: Some(builder.create_string(&out.filename)),
+//       media_type: out.media_type,
+//       source_code: Some(builder.create_string(&out.source_code)),
+//       ..Default::default()
+//     };
+//     if let Some(ref output_code) = out.maybe_output_code {
+//       msg_args.output_code = Some(builder.create_string(output_code));
+//     }
+//     if let Some(ref source_map) = out.maybe_source_map {
+//       msg_args.source_map = Some(builder.create_string(source_map));
+//     }
+//     let inner = msg::CodeFetchRes::create(builder, &msg_args);
+//     Ok(serialize_response(
+//       cmd_id,
+//       builder,
+//       msg::BaseArgs {
+//         inner: Some(inner.as_union_value()),
+//         inner_type: msg::Any::CodeFetchRes,
+//         ..Default::default()
+//       },
+//     ))
+//   }()))
+// }
 
 // https://github.com/denoland/deno/blob/golang/os.go#L156-L169
-fn op_code_cache(
-  state: &Arc<IsolateState>,
-  base: &msg::Base,
-  data: &'static mut [u8],
-) -> Box<Op> {
-  assert_eq!(data.len(), 0);
-  let inner = base.inner_as_code_cache().unwrap();
-  let filename = inner.filename().unwrap();
-  let source_code = inner.source_code().unwrap();
-  let output_code = inner.output_code().unwrap();
-  let source_map = inner.source_map().unwrap();
-  Box::new(futures::future::result(|| -> OpResult {
-    state
-      .code_provider
-      .code_cache(filename, source_code, output_code, source_map)?;
-    Ok(empty_buf())
-  }()))
-}
+// fn op_code_cache(
+//   state: &Arc<IsolateState>,
+//   base: &msg::Base,
+//   data: &'static mut [u8],
+// ) -> Box<Op> {
+//   assert_eq!(data.len(), 0);
+//   let inner = base.inner_as_code_cache().unwrap();
+//   let filename = inner.filename().unwrap();
+//   let source_code = inner.source_code().unwrap();
+//   let output_code = inner.output_code().unwrap();
+//   let source_map = inner.source_map().unwrap();
+//   Box::new(futures::future::result(|| -> OpResult {
+//     state
+//       .code_provider
+//       .code_cache(filename, source_code, output_code, source_map)?;
+//     Ok(empty_buf())
+//   }()))
+// }
 
 fn op_compiler_start(
   state: &Arc<IsolateState>,

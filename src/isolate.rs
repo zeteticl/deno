@@ -379,159 +379,159 @@ fn recv_deadline<T>(
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use futures;
+// #[cfg(test)]
+// mod tests {
+//   use super::*;
+//   use futures;
 
-  #[test]
-  fn test_dispatch_sync() {
-    let argv = vec![String::from("./deno"), String::from("hello.js")];
-    let (flags, rest_argv, _) = flags::set_flags(argv).unwrap();
-    let mut isolate = Isolate::new(empty(), flags, rest_argv, dispatch_sync);
-    tokio_util::init(|| {
-      isolate
-        .execute(
-          "y.js",
-          r#"
-          const m = new Uint8Array([4, 5, 6]);
-          let n = libdeno.send(m);
-          if (!(n.byteLength === 3 &&
-                n[0] === 1 &&
-                n[1] === 2 &&
-                n[2] === 3)) {
-            throw Error("assert error");
-          }
-        "#,
-        ).expect("execute error");
-      isolate.event_loop();
-    });
-  }
+//   #[test]
+//   fn test_dispatch_sync() {
+//     let argv = vec![String::from("./deno"), String::from("hello.js")];
+//     let (flags, rest_argv, _) = flags::set_flags(argv).unwrap();
+//     let mut isolate = Isolate::new(empty(), flags, rest_argv, dispatch_sync);
+//     tokio_util::init(|| {
+//       isolate
+//         .execute(
+//           "y.js",
+//           r#"
+//           const m = new Uint8Array([4, 5, 6]);
+//           let n = libdeno.send(m);
+//           if (!(n.byteLength === 3 &&
+//                 n[0] === 1 &&
+//                 n[1] === 2 &&
+//                 n[2] === 3)) {
+//             throw Error("assert error");
+//           }
+//         "#,
+//         ).expect("execute error");
+//       isolate.event_loop();
+//     });
+//   }
 
-  fn dispatch_sync(
-    _isolate: &mut Isolate,
-    control: &[u8],
-    data: &'static mut [u8],
-  ) -> (bool, Box<Op>) {
-    assert_eq!(control[0], 4);
-    assert_eq!(control[1], 5);
-    assert_eq!(control[2], 6);
-    assert_eq!(data.len(), 0);
-    // Send back some sync response.
-    let vec: Vec<u8> = vec![1, 2, 3];
-    let control = vec.into_boxed_slice();
-    let op = Box::new(futures::future::ok(control));
-    (true, op)
-  }
+//   fn dispatch_sync(
+//     _isolate: &mut Isolate,
+//     control: &[u8],
+//     data: &'static mut [u8],
+//   ) -> (bool, Box<Op>) {
+//     assert_eq!(control[0], 4);
+//     assert_eq!(control[1], 5);
+//     assert_eq!(control[2], 6);
+//     assert_eq!(data.len(), 0);
+//     // Send back some sync response.
+//     let vec: Vec<u8> = vec![1, 2, 3];
+//     let control = vec.into_boxed_slice();
+//     let op = Box::new(futures::future::ok(control));
+//     (true, op)
+//   }
 
-  #[test]
-  fn test_metrics_sync() {
-    let argv = vec![String::from("./deno"), String::from("hello.js")];
-    let (flags, rest_argv, _) = flags::set_flags(argv).unwrap();
-    let mut isolate =
-      Isolate::new(empty(), flags, rest_argv, metrics_dispatch_sync);
-    tokio_util::init(|| {
-      // Verify that metrics have been properly initialized.
-      {
-        let metrics = isolate.state.metrics.lock().unwrap();
-        assert_eq!(metrics.ops_dispatched, 0);
-        assert_eq!(metrics.ops_completed, 0);
-        assert_eq!(metrics.bytes_sent_control, 0);
-        assert_eq!(metrics.bytes_sent_data, 0);
-        assert_eq!(metrics.bytes_received, 0);
-      }
+//   #[test]
+//   fn test_metrics_sync() {
+//     let argv = vec![String::from("./deno"), String::from("hello.js")];
+//     let (flags, rest_argv, _) = flags::set_flags(argv).unwrap();
+//     let mut isolate =
+//       Isolate::new(empty(), flags, rest_argv, metrics_dispatch_sync);
+//     tokio_util::init(|| {
+//       // Verify that metrics have been properly initialized.
+//       {
+//         let metrics = isolate.state.metrics.lock().unwrap();
+//         assert_eq!(metrics.ops_dispatched, 0);
+//         assert_eq!(metrics.ops_completed, 0);
+//         assert_eq!(metrics.bytes_sent_control, 0);
+//         assert_eq!(metrics.bytes_sent_data, 0);
+//         assert_eq!(metrics.bytes_received, 0);
+//       }
 
-      isolate
-        .execute(
-          "y.js",
-          r#"
-          const control = new Uint8Array([4, 5, 6]);
-          const data = new Uint8Array([42, 43, 44, 45, 46]);
-          libdeno.send(control, data);
-        "#,
-        ).expect("execute error");
-      isolate.event_loop();
-      let metrics = isolate.state.metrics.lock().unwrap();
-      assert_eq!(metrics.ops_dispatched, 1);
-      assert_eq!(metrics.ops_completed, 1);
-      assert_eq!(metrics.bytes_sent_control, 3);
-      assert_eq!(metrics.bytes_sent_data, 5);
-      assert_eq!(metrics.bytes_received, 4);
-    });
-  }
+//       isolate
+//         .execute(
+//           "y.js",
+//           r#"
+//           const control = new Uint8Array([4, 5, 6]);
+//           const data = new Uint8Array([42, 43, 44, 45, 46]);
+//           libdeno.send(control, data);
+//         "#,
+//         ).expect("execute error");
+//       isolate.event_loop();
+//       let metrics = isolate.state.metrics.lock().unwrap();
+//       assert_eq!(metrics.ops_dispatched, 1);
+//       assert_eq!(metrics.ops_completed, 1);
+//       assert_eq!(metrics.bytes_sent_control, 3);
+//       assert_eq!(metrics.bytes_sent_data, 5);
+//       assert_eq!(metrics.bytes_received, 4);
+//     });
+//   }
 
-  #[test]
-  fn test_metrics_async() {
-    let argv = vec![String::from("./deno"), String::from("hello.js")];
-    let (flags, rest_argv, _) = flags::set_flags(argv).unwrap();
-    let mut isolate =
-      Isolate::new(empty(), flags, rest_argv, metrics_dispatch_async);
-    tokio_util::init(|| {
-      // Verify that metrics have been properly initialized.
-      {
-        let metrics = isolate.state.metrics.lock().unwrap();
-        assert_eq!(metrics.ops_dispatched, 0);
-        assert_eq!(metrics.ops_completed, 0);
-        assert_eq!(metrics.bytes_sent_control, 0);
-        assert_eq!(metrics.bytes_sent_data, 0);
-        assert_eq!(metrics.bytes_received, 0);
-      }
+//   #[test]
+//   fn test_metrics_async() {
+//     let argv = vec![String::from("./deno"), String::from("hello.js")];
+//     let (flags, rest_argv, _) = flags::set_flags(argv).unwrap();
+//     let mut isolate =
+//       Isolate::new(empty(), flags, rest_argv, metrics_dispatch_async);
+//     tokio_util::init(|| {
+//       // Verify that metrics have been properly initialized.
+//       {
+//         let metrics = isolate.state.metrics.lock().unwrap();
+//         assert_eq!(metrics.ops_dispatched, 0);
+//         assert_eq!(metrics.ops_completed, 0);
+//         assert_eq!(metrics.bytes_sent_control, 0);
+//         assert_eq!(metrics.bytes_sent_data, 0);
+//         assert_eq!(metrics.bytes_received, 0);
+//       }
 
-      isolate
-        .execute(
-          "y.js",
-          r#"
-          const control = new Uint8Array([4, 5, 6]);
-          const data = new Uint8Array([42, 43, 44, 45, 46]);
-          let r = libdeno.send(control, data);
-          if (r != null) throw Error("expected null");
-        "#,
-        ).expect("execute error");
+//       isolate
+//         .execute(
+//           "y.js",
+//           r#"
+//           const control = new Uint8Array([4, 5, 6]);
+//           const data = new Uint8Array([42, 43, 44, 45, 46]);
+//           let r = libdeno.send(control, data);
+//           if (r != null) throw Error("expected null");
+//         "#,
+//         ).expect("execute error");
 
-      // Make sure relevant metrics are updated before task is executed.
-      {
-        let metrics = isolate.state.metrics.lock().unwrap();
-        assert_eq!(metrics.ops_dispatched, 1);
-        assert_eq!(metrics.bytes_sent_control, 3);
-        assert_eq!(metrics.bytes_sent_data, 5);
-        // Note we cannot check ops_completed nor bytes_received because that
-        // would be a race condition. It might be nice to have use a oneshot
-        // with metrics_dispatch_async() to properly validate them.
-      }
+//       // Make sure relevant metrics are updated before task is executed.
+//       {
+//         let metrics = isolate.state.metrics.lock().unwrap();
+//         assert_eq!(metrics.ops_dispatched, 1);
+//         assert_eq!(metrics.bytes_sent_control, 3);
+//         assert_eq!(metrics.bytes_sent_data, 5);
+//         // Note we cannot check ops_completed nor bytes_received because that
+//         // would be a race condition. It might be nice to have use a oneshot
+//         // with metrics_dispatch_async() to properly validate them.
+//       }
 
-      isolate.event_loop();
+//       isolate.event_loop();
 
-      // Make sure relevant metrics are updated after task is executed.
-      {
-        let metrics = isolate.state.metrics.lock().unwrap();
-        assert_eq!(metrics.ops_dispatched, 1);
-        assert_eq!(metrics.ops_completed, 1);
-        assert_eq!(metrics.bytes_sent_control, 3);
-        assert_eq!(metrics.bytes_sent_data, 5);
-        assert_eq!(metrics.bytes_received, 4);
-      }
-    });
-  }
+//       // Make sure relevant metrics are updated after task is executed.
+//       {
+//         let metrics = isolate.state.metrics.lock().unwrap();
+//         assert_eq!(metrics.ops_dispatched, 1);
+//         assert_eq!(metrics.ops_completed, 1);
+//         assert_eq!(metrics.bytes_sent_control, 3);
+//         assert_eq!(metrics.bytes_sent_data, 5);
+//         assert_eq!(metrics.bytes_received, 4);
+//       }
+//     });
+//   }
 
-  fn metrics_dispatch_sync(
-    _isolate: &mut Isolate,
-    _control: &[u8],
-    _data: &'static mut [u8],
-  ) -> (bool, Box<Op>) {
-    // Send back some sync response
-    let vec: Box<[u8]> = vec![1, 2, 3, 4].into_boxed_slice();
-    let op = Box::new(futures::future::ok(vec));
-    (true, op)
-  }
+//   fn metrics_dispatch_sync(
+//     _isolate: &mut Isolate,
+//     _control: &[u8],
+//     _data: &'static mut [u8],
+//   ) -> (bool, Box<Op>) {
+//     // Send back some sync response
+//     let vec: Box<[u8]> = vec![1, 2, 3, 4].into_boxed_slice();
+//     let op = Box::new(futures::future::ok(vec));
+//     (true, op)
+//   }
 
-  fn metrics_dispatch_async(
-    _isolate: &mut Isolate,
-    _control: &[u8],
-    _data: &'static mut [u8],
-  ) -> (bool, Box<Op>) {
-    // Send back some sync response
-    let vec: Box<[u8]> = vec![1, 2, 3, 4].into_boxed_slice();
-    let op = Box::new(futures::future::ok(vec));
-    (false, op)
-  }
-}
+//   fn metrics_dispatch_async(
+//     _isolate: &mut Isolate,
+//     _control: &[u8],
+//     _data: &'static mut [u8],
+//   ) -> (bool, Box<Op>) {
+//     // Send back some sync response
+//     let vec: Box<[u8]> = vec![1, 2, 3, 4].into_boxed_slice();
+//     let op = Box::new(futures::future::ok(vec));
+//     (false, op)
+//   }
+// }
