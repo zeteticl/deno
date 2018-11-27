@@ -26,7 +26,7 @@ extern crate log;
 #[macro_use]
 extern crate futures;
 
-pub mod deno_dir;
+pub mod code_provider;
 pub mod errors;
 pub mod flags;
 mod fs;
@@ -49,6 +49,7 @@ pub mod version;
 mod eager_unix;
 
 use std::env;
+use std::path::Path;
 
 static LOGGER: Logger = Logger;
 
@@ -95,14 +96,26 @@ fn main() {
     log::LevelFilter::Info
   });
 
+  let custom_root_path;
+  let custom_root = match env::var("DENO_DIR") {
+    Ok(path) => {
+      custom_root_path = path;
+      Some(Path::new(custom_root_path.as_str()))
+    }
+    Err(_e) => None,
+  };
+
+  let cp = code_provider::CodeProvider::new(flags.reload, custom_root).unwrap();
+
   // TODO this feels a bit hacky, but it works
   let rest_argv_copy = rest_argv.to_vec();
 
   let mut compiler_isolate = isolate::Isolate::new(
     unsafe { snapshot::compiler_snapshot.clone() },
     flags,
-    rest_argv_copy,
+    rest_argv,
     ops::dispatch,
+    &cp
   );
   tokio_util::init(|| {
     compiler_isolate
@@ -117,8 +130,9 @@ fn main() {
   let mut deno_isolate = isolate::Isolate::new(
     unsafe { snapshot::deno_snapshot.clone() },
     flags,
-    rest_argv,
+    rest_argv_copy,
     ops::dispatch,
+    &cp
   );
   tokio_util::init(|| {
     deno_isolate

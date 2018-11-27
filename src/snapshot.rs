@@ -23,7 +23,9 @@ pub fn deno_snapshot() -> deno_buf {
 }
 
 pub fn compiler_snapshot() -> deno_buf {
-  let data =
-    include_bytes!(concat!(env!("GN_OUT_DIR"), "/gen/snapshot_deno_compiler.bin"));
+  let data = include_bytes!(concat!(
+    env!("GN_OUT_DIR"),
+    "/gen/snapshot_deno_compiler.bin"
+  ));
   get_snapshot(data)
 }

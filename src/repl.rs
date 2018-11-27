@@ -6,7 +6,7 @@ use rustyline::error::ReadlineError::Interrupted;
 use msg::ErrorKind;
 use std::error::Error;
 
-use deno_dir::DenoDir;
+use code_provider::CodeProvider;
 use errors::new as deno_error;
 use errors::DenoResult;
 use std::path::PathBuf;
@@ -115,7 +115,7 @@ impl Drop for Repl {
   }
 }
 
-pub fn history_path(dir: &DenoDir, history_file: &str) -> PathBuf {
+pub fn history_path(dir: &CodeProvider, history_file: &str) -> PathBuf {
   let mut p: PathBuf = dir.root.clone();
   p.push(history_file);
   p

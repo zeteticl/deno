@@ -44,10 +44,7 @@ export { resources } from "./resources";
 export { run, RunOptions, Process, ProcessStatus } from "./process";
 export const args: string[] = [];
 
-// Provide the compiler API in an obfuscated way
-import * as compiler from "./compiler";
-// @internal
-export const _compiler = compiler;
+// Provide the runner API in an obfuscated way
 import * as runner from "./runner";
 // @internal
 export const _runner = runner;

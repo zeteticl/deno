@@ -5,27 +5,14 @@ import "./globals";
 import * as flatbuffers from "./flatbuffers";
 import * as msg from "gen/msg_generated";
 import { assert, log, setLogDebug } from "./util";
-import * as os from "./os";
-import { Compiler } from "./compiler";
+import { exit } from "./os";
+import * as codeProvider from "./code_provider";
 import { Runner } from "./runner";
 import { libdeno } from "./libdeno";
 import { args } from "./deno";
 import { sendSync, handleAsyncMsgFromRust } from "./dispatch";
 import { promiseErrorExaminer, promiseRejectHandler } from "./promise_util";
 import { replLoop } from "./repl";
-import * as sourceMaps from "./v8_source_maps";
-import { version } from "typescript";
-
-// Install the source maps handler and do some pre-calculations so all of it is
-// available in the snapshot
-const compiler = Compiler.instance();
-sourceMaps.install({
-  installPrepareStackTrace: true,
-  getGeneratedContents: compiler.getGeneratedContents
-});
-const consumer = sourceMaps.loadConsumer("gen/bundle/main.js");
-assert(consumer != null);
-consumer!.computeColumnSpans();
 
 function sendStart(): msg.StartRes {
   const builder = flatbuffers.createBuilder();
@@ -51,7 +38,7 @@ function onGlobalError(
   } else {
     console.log(`Thrown: ${String(error)}`);
   }
-  os.exit(1);
+  exit(1);
 }
 
 /* tslint:disable-next-line:no-default-export */
@@ -68,19 +55,12 @@ export default function denoMain() {
 
   setLogDebug(startResMsg.debugFlag());
 
-  // handle `--types`
-  if (startResMsg.typesFlag()) {
-    const defaultLibFileName = compiler.getDefaultLibFileName();
-    console.log(compiler.getSource(defaultLibFileName));
-    os.exit(0);
-  }
-
   // handle `--version`
   if (startResMsg.versionFlag()) {
     console.log("deno:", startResMsg.denoVersion());
     console.log("v8:", startResMsg.v8Version());
-    console.log("typescript:", version);
-    os.exit(0);
+    // TODO find another way to determine TypeScript version
+    exit(0);
   }
 
   const cwd = startResMsg.cwd();
@@ -93,8 +73,7 @@ export default function denoMain() {
   Object.freeze(args);
   const inputFn = args[0];
 
-  compiler.recompile = startResMsg.recompileFlag();
-  const runner = new Runner(compiler);
+  const runner = new Runner(codeProvider);
 
   if (inputFn) {
     runner.run(inputFn, `${cwd}/`);

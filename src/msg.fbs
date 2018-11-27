@@ -10,8 +10,10 @@ union Any {
   CompilationRes,
   ModuleFilename,
   ModuleFilenameRes,
-  ModuleFetch,
-  ModuleFetchRes,
+  ModuleCodeFetch,
+  ModuleCodeFetchRes,
+  ModuleSourceFetch,
+  ModuleSourceFetchRes,
   SetTimeout,
   Exit,
   Environ,
@@ -183,10 +185,10 @@ table CompilerStart {
 }
 
 table CompilerStartRes {
-  data: [ubyte]; // This is the source code to transpile
   debug_flag: bool;
   filename: string;
   recompile_flag: bool;
+  types_flag: bool;
 }
 
 table Compilation {
@@ -195,7 +197,6 @@ table Compilation {
 }
 
 table CompilationRes {
-  data: [ubyte]; // This is the source code to transpile
   done: bool;
   filename: string;
 }
@@ -209,12 +210,21 @@ table ModuleFilenameRes {
   filename: string;
 }
 
-table ModuleFetch {
+table ModuleCodeFetch {
   filename: string;
 }
 
-table ModuleFetchRes {
+table ModuleCodeFetchRes {
   data: [ubyte];  // This is the output code
+}
+
+table ModuleSourceFetch {
+  filename: string;
+}
+
+table ModuleSourceFetchRes {
+  data: [ubyte];  // This is the source code
+  media_type: MediaType;
 }
 
 table Chdir {

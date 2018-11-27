@@ -18,7 +18,7 @@ use tempfile::TempDir;
 use url;
 use url::Url;
 
-pub struct DenoDir {
+pub struct CodeProvider {
   // Example: /Users/rld/.deno/
   pub root: PathBuf,
   // In the Go code this was called SrcDir.
@@ -36,7 +36,7 @@ pub struct DenoDir {
   reload: bool,
 }
 
-impl DenoDir {
+impl CodeProvider {
   // Must be called before using any function from this module.
   // https://github.com/denoland/deno/blob/golang/deno_dir.go#L99-L111
   pub fn new(
@@ -56,7 +56,7 @@ impl DenoDir {
     let deps_http = deps.join("http");
     let deps_https = deps.join("https");
 
-    let deno_dir = Self {
+    let code_provider = Self {
       root,
       gen,
       deps,
@@ -64,18 +64,18 @@ impl DenoDir {
       deps_https,
       reload,
     };
-    deno_fs::mkdir(deno_dir.gen.as_ref(), 0o755)?;
-    deno_fs::mkdir(deno_dir.deps.as_ref(), 0o755)?;
-    deno_fs::mkdir(deno_dir.deps_http.as_ref(), 0o755)?;
-    deno_fs::mkdir(deno_dir.deps_https.as_ref(), 0o755)?;
+    deno_fs::mkdir(code_provider.gen.as_ref(), 0o755)?;
+    deno_fs::mkdir(code_provider.deps.as_ref(), 0o755)?;
+    deno_fs::mkdir(code_provider.deps_http.as_ref(), 0o755)?;
+    deno_fs::mkdir(code_provider.deps_https.as_ref(), 0o755)?;
 
-    debug!("root {}", deno_dir.root.display());
-    debug!("gen {}", deno_dir.gen.display());
-    debug!("deps {}", deno_dir.deps.display());
-    debug!("deps_http {}", deno_dir.deps_http.display());
-    debug!("deps_https {}", deno_dir.deps_https.display());
+    debug!("root {}", code_provider.root.display());
+    debug!("gen {}", code_provider.gen.display());
+    debug!("deps {}", code_provider.deps.display());
+    debug!("deps_http {}", code_provider.deps_http.display());
+    debug!("deps_https {}", code_provider.deps_https.display());
 
-    Ok(deno_dir)
+    Ok(code_provider)
   }
 
   // https://github.com/denoland/deno/blob/golang/deno_dir.go#L32-L35
@@ -388,16 +388,16 @@ pub struct CodeFetchOutput {
 }
 
 #[cfg(test)]
-pub fn test_setup() -> (TempDir, DenoDir) {
+pub fn test_setup() -> (TempDir, CodeProvider) {
   let temp_dir = TempDir::new().expect("tempdir fail");
-  let deno_dir =
-    DenoDir::new(false, Some(temp_dir.path())).expect("setup fail");
-  (temp_dir, deno_dir)
+  let code_provider =
+    CodeProvider::new(false, Some(temp_dir.path())).expect("setup fail");
+  (temp_dir, code_provider)
 }
 
 #[test]
 fn test_cache_path() {
-  let (temp_dir, deno_dir) = test_setup();
+  let (temp_dir, code_provider) = test_setup();
   assert_eq!(
     (
       temp_dir
@@ -407,20 +407,20 @@ fn test_cache_path() {
         .path()
         .join("gen/a3e29aece8d35a19bf9da2bb1c086af71fb36ed5.js.map")
     ),
-    deno_dir.cache_path("hello.ts", "1+2")
+    code_provider.cache_path("hello.ts", "1+2")
   );
 }
 
 #[test]
 fn test_code_cache() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let filename = "hello.js";
   let source_code = "1+2";
   let output_code = "1+2 // output code";
   let source_map = "{}";
   let (cache_path, source_map_path) =
-    deno_dir.cache_path(filename, source_code);
+    code_provider.cache_path(filename, source_code);
   assert!(
     cache_path.ends_with("gen/e8e3ee6bee4aef2ec63f6ec3db7fc5fdfae910ae.js")
   );
@@ -429,7 +429,7 @@ fn test_code_cache() {
       .ends_with("gen/e8e3ee6bee4aef2ec63f6ec3db7fc5fdfae910ae.js.map")
   );
 
-  let r = deno_dir.code_cache(filename, source_code, output_code, source_map);
+  let r = code_provider.code_cache(filename, source_code, output_code, source_map);
   r.expect("code_cache error");
   assert!(cache_path.exists());
   assert_eq!(output_code, fs::read_to_string(&cache_path).unwrap());
@@ -483,7 +483,7 @@ macro_rules! add_root {
 
 #[test]
 fn test_code_fetch() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let cwd = std::env::current_dir().unwrap();
   let cwd_string = String::from(cwd.to_str().unwrap()) + "/";
@@ -491,13 +491,13 @@ fn test_code_fetch() {
   // Test failure case.
   let module_specifier = "hello.ts";
   let containing_file = add_root!("/baddir/badfile.ts");
-  let r = deno_dir.code_fetch(module_specifier, containing_file);
+  let r = code_provider.code_fetch(module_specifier, containing_file);
   assert!(r.is_err());
 
   // Assuming cwd is the deno repo root.
   let module_specifier = "./js/main.ts";
   let containing_file = cwd_string.as_str();
-  let r = deno_dir.code_fetch(module_specifier, containing_file);
+  let r = code_provider.code_fetch(module_specifier, containing_file);
   assert!(r.is_ok());
   //let code_fetch_output = r.unwrap();
   //println!("code_fetch_output {:?}", code_fetch_output);
@@ -505,7 +505,7 @@ fn test_code_fetch() {
 
 #[test]
 fn test_code_fetch_no_ext() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let cwd = std::env::current_dir().unwrap();
   let cwd_string = String::from(cwd.to_str().unwrap()) + "/";
@@ -513,14 +513,14 @@ fn test_code_fetch_no_ext() {
   // Assuming cwd is the deno repo root.
   let module_specifier = "./js/main";
   let containing_file = cwd_string.as_str();
-  let r = deno_dir.code_fetch(module_specifier, containing_file);
+  let r = code_provider.code_fetch(module_specifier, containing_file);
   assert!(r.is_ok());
 
   // Test .ts extension
   // Assuming cwd is the deno repo root.
   let module_specifier = "./js/main";
   let containing_file = cwd_string.as_str();
-  let r = deno_dir.code_fetch(module_specifier, containing_file);
+  let r = code_provider.code_fetch(module_specifier, containing_file);
   assert!(r.is_ok());
   let code_fetch_output = r.unwrap();
   // could only test .ends_with to avoid include local abs path
@@ -532,7 +532,7 @@ fn test_code_fetch_no_ext() {
   // Assuming cwd is the deno repo root.
   let module_specifier = "./js/mock_builtin";
   let containing_file = cwd_string.as_str();
-  let r = deno_dir.code_fetch(module_specifier, containing_file);
+  let r = code_provider.code_fetch(module_specifier, containing_file);
   assert!(r.is_ok());
   let code_fetch_output = r.unwrap();
   // could only test .ends_with to avoid include local abs path
@@ -547,52 +547,52 @@ fn test_code_fetch_no_ext() {
 
 #[test]
 fn test_src_file_to_url_1() {
-  let (_temp_dir, deno_dir) = test_setup();
-  assert_eq!("hello", deno_dir.src_file_to_url("hello"));
-  assert_eq!("/hello", deno_dir.src_file_to_url("/hello"));
-  let x = deno_dir.deps_http.join("hello/world.txt");
+  let (_temp_dir, code_provider) = test_setup();
+  assert_eq!("hello", code_provider.src_file_to_url("hello"));
+  assert_eq!("/hello", code_provider.src_file_to_url("/hello"));
+  let x = code_provider.deps_http.join("hello/world.txt");
   assert_eq!(
     "http://hello/world.txt",
-    deno_dir.src_file_to_url(x.to_str().unwrap())
+    code_provider.src_file_to_url(x.to_str().unwrap())
   );
 }
 
 #[test]
 fn test_src_file_to_url_2() {
-  let (_temp_dir, deno_dir) = test_setup();
-  assert_eq!("hello", deno_dir.src_file_to_url("hello"));
-  assert_eq!("/hello", deno_dir.src_file_to_url("/hello"));
-  let x = deno_dir.deps_https.join("hello/world.txt");
+  let (_temp_dir, code_provider) = test_setup();
+  assert_eq!("hello", code_provider.src_file_to_url("hello"));
+  assert_eq!("/hello", code_provider.src_file_to_url("/hello"));
+  let x = code_provider.deps_https.join("hello/world.txt");
   assert_eq!(
     "https://hello/world.txt",
-    deno_dir.src_file_to_url(x.to_str().unwrap())
+    code_provider.src_file_to_url(x.to_str().unwrap())
   );
 }
 
 #[test]
 fn test_src_file_to_url_3() {
-  let (_temp_dir, deno_dir) = test_setup();
-  let x = deno_dir.deps_http.join("localhost_PORT4545/world.txt");
+  let (_temp_dir, code_provider) = test_setup();
+  let x = code_provider.deps_http.join("localhost_PORT4545/world.txt");
   assert_eq!(
     "http://localhost:4545/world.txt",
-    deno_dir.src_file_to_url(x.to_str().unwrap())
+    code_provider.src_file_to_url(x.to_str().unwrap())
   );
 }
 
 #[test]
 fn test_src_file_to_url_4() {
-  let (_temp_dir, deno_dir) = test_setup();
-  let x = deno_dir.deps_https.join("localhost_PORT4545/world.txt");
+  let (_temp_dir, code_provider) = test_setup();
+  let x = code_provider.deps_https.join("localhost_PORT4545/world.txt");
   assert_eq!(
     "https://localhost:4545/world.txt",
-    deno_dir.src_file_to_url(x.to_str().unwrap())
+    code_provider.src_file_to_url(x.to_str().unwrap())
   );
 }
 
 // https://github.com/denoland/deno/blob/golang/os_test.go#L16-L87
 #[test]
 fn test_resolve_module_1() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let test_cases = [
     (
@@ -629,7 +629,7 @@ fn test_resolve_module_1() {
   for &test in test_cases.iter() {
     let module_specifier = String::from(test.0);
     let containing_file = String::from(test.1);
-    let (module_name, filename) = deno_dir
+    let (module_name, filename) = code_provider
       .resolve_module(&module_specifier, &containing_file)
       .unwrap();
     assert_eq!(module_name, test.2);
@@ -639,7 +639,7 @@ fn test_resolve_module_1() {
 
 #[test]
 fn test_resolve_module_2() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let module_specifier = "http://localhost:4545/testdata/subdir/print_hello.ts";
   let containing_file = add_root!("/deno/testdata/006_url_imports.ts");
@@ -647,13 +647,13 @@ fn test_resolve_module_2() {
   let expected_module_name =
     "http://localhost:4545/testdata/subdir/print_hello.ts";
   let expected_filename = deno_fs::normalize_path(
-    deno_dir
+    code_provider
       .deps_http
       .join("localhost_PORT4545/testdata/subdir/print_hello.ts")
       .as_ref(),
   );
 
-  let (module_name, filename) = deno_dir
+  let (module_name, filename) = code_provider
     .resolve_module(module_specifier, containing_file)
     .unwrap();
   assert_eq!(module_name, expected_module_name);
@@ -662,22 +662,22 @@ fn test_resolve_module_2() {
 
 #[test]
 fn test_resolve_module_3() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let module_specifier_ =
-    deno_dir.deps_http.join("unpkg.com/liltest@0.0.5/index.ts");
+    code_provider.deps_http.join("unpkg.com/liltest@0.0.5/index.ts");
   let module_specifier = module_specifier_.to_str().unwrap();
   let containing_file = ".";
 
   let expected_module_name = "http://unpkg.com/liltest@0.0.5/index.ts";
   let expected_filename = deno_fs::normalize_path(
-    deno_dir
+    code_provider
       .deps_http
       .join("unpkg.com/liltest@0.0.5/index.ts")
       .as_ref(),
   );
 
-  let (module_name, filename) = deno_dir
+  let (module_name, filename) = code_provider
     .resolve_module(module_specifier, containing_file)
     .unwrap();
   assert_eq!(module_name, expected_module_name);
@@ -686,23 +686,23 @@ fn test_resolve_module_3() {
 
 #[test]
 fn test_resolve_module_4() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let module_specifier = "./util";
   let containing_file_ =
-    deno_dir.deps_http.join("unpkg.com/liltest@0.0.5/index.ts");
+    code_provider.deps_http.join("unpkg.com/liltest@0.0.5/index.ts");
   let containing_file = containing_file_.to_str().unwrap();
 
   // http containing files -> load relative import with http
   let expected_module_name = "http://unpkg.com/liltest@0.0.5/util";
   let expected_filename = deno_fs::normalize_path(
-    deno_dir
+    code_provider
       .deps_http
       .join("unpkg.com/liltest@0.0.5/util")
       .as_ref(),
   );
 
-  let (module_name, filename) = deno_dir
+  let (module_name, filename) = code_provider
     .resolve_module(module_specifier, containing_file)
     .unwrap();
   assert_eq!(module_name, expected_module_name);
@@ -711,23 +711,23 @@ fn test_resolve_module_4() {
 
 #[test]
 fn test_resolve_module_5() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let module_specifier = "./util";
   let containing_file_ =
-    deno_dir.deps_https.join("unpkg.com/liltest@0.0.5/index.ts");
+    code_provider.deps_https.join("unpkg.com/liltest@0.0.5/index.ts");
   let containing_file = containing_file_.to_str().unwrap();
 
   // https containing files -> load relative import with https
   let expected_module_name = "https://unpkg.com/liltest@0.0.5/util";
   let expected_filename = deno_fs::normalize_path(
-    deno_dir
+    code_provider
       .deps_https
       .join("unpkg.com/liltest@0.0.5/util")
       .as_ref(),
   );
 
-  let (module_name, filename) = deno_dir
+  let (module_name, filename) = code_provider
     .resolve_module(module_specifier, containing_file)
     .unwrap();
   assert_eq!(module_name, expected_module_name);
@@ -736,19 +736,19 @@ fn test_resolve_module_5() {
 
 #[test]
 fn test_resolve_module_6() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let module_specifier = "http://localhost:4545/tests/subdir/mod2.ts";
   let containing_file = add_root!("/deno/tests/006_url_imports.ts");
   let expected_module_name = "http://localhost:4545/tests/subdir/mod2.ts";
   let expected_filename = deno_fs::normalize_path(
-    deno_dir
+    code_provider
       .deps_http
       .join("localhost_PORT4545/tests/subdir/mod2.ts")
       .as_ref(),
   );
 
-  let (module_name, filename) = deno_dir
+  let (module_name, filename) = code_provider
     .resolve_module(module_specifier, containing_file)
     .unwrap();
   assert_eq!(module_name, expected_module_name);
@@ -757,14 +757,14 @@ fn test_resolve_module_6() {
 
 #[test]
 fn test_resolve_module_7() {
-  let (_temp_dir, deno_dir) = test_setup();
+  let (_temp_dir, code_provider) = test_setup();
 
   let module_specifier = "http_test.ts";
   let containing_file = add_root!("/Users/rld/src/deno_net/");
   let expected_module_name = add_root!("/Users/rld/src/deno_net/http_test.ts");
   let expected_filename = add_root!("/Users/rld/src/deno_net/http_test.ts");
 
-  let (module_name, filename) = deno_dir
+  let (module_name, filename) = code_provider
     .resolve_module(module_specifier, containing_file)
     .unwrap();
   assert_eq!(module_name, expected_module_name);

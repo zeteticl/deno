@@ -96,8 +96,9 @@ pub fn dispatch(
       msg::Any::MakeTempDir => op_make_temp_dir,
       msg::Any::Metrics => op_metrics,
       msg::Any::Mkdir => op_mkdir,
-      // msg::Any::ModuleFilename => op_module_filename,
-      // msg::Any::ModuleFetch => op_module_fetch,
+      // msg::Any::ModuleCodeFetch => op_module_code_fetch,
+      msg::Any::ModuleFilename => op_module_filename,
+      msg::Any::ModuleSourceFetch => op_module_source_fetch,
       msg::Any::Open => op_open,
       msg::Any::ReadDir => op_read_dir,
       msg::Any::ReadFile => op_read_file,
@@ -261,11 +262,11 @@ fn op_code_fetch(
   let module_specifier = inner.module_specifier().unwrap();
   let containing_file = inner.containing_file().unwrap();
 
-  assert_eq!(state.dir.root.join("gen"), state.dir.gen, "Sanity check");
+  assert_eq!(state.code_provider.root.join("gen"), state.code_provider.gen, "Sanity check");
 
   Box::new(futures::future::result(|| -> OpResult {
     let builder = &mut FlatBufferBuilder::new();
-    let out = state.dir.code_fetch(module_specifier, containing_file)?;
+    let out = state.code_provider.code_fetch(module_specifier, containing_file)?;
     let mut msg_args = msg::CodeFetchResArgs {
       module_name: Some(builder.create_string(&out.module_name)),
       filename: Some(builder.create_string(&out.filename)),
@@ -306,7 +307,7 @@ fn op_code_cache(
   let source_map = inner.source_map().unwrap();
   Box::new(futures::future::result(|| -> OpResult {
     state
-      .dir
+      .code_provider
       .code_cache(filename, source_code, output_code, source_map)?;
     Ok(empty_buf())
   }()))
@@ -320,15 +321,14 @@ fn op_compiler_start(
   assert_eq!(data.len(), 0);
   let mut builder = FlatBufferBuilder::new();
   let filename = builder.create_string("example.ts");
-  let data_off = builder.create_vector("'source code';".as_bytes());
 
   let inner = msg::CompilerStartRes::create(
     &mut builder,
     &msg::CompilerStartResArgs {
       debug_flag: state.flags.log_debug,
       recompile_flag: state.flags.recompile,
+      types_flag: state.flags.types,
       filename: Some(filename),
-      data: Some(data_off),
       ..Default::default()
     },
   );
@@ -343,7 +343,7 @@ fn op_compiler_start(
   ))
 }
 
-fn op_compilation (
+fn op_compilation(
   _state: &Arc<IsolateState>,
   base: &msg::Base,
   data: &'static mut [u8],
@@ -353,17 +353,15 @@ fn op_compilation (
   debug!("op_compilation {} {}", source_map, data.len());
   let mut builder = FlatBufferBuilder::new();
   let filename = builder.create_string("example.ts");
-  let data_off = builder.create_vector("'source code';".as_bytes());
 
   let inner = msg::CompilationRes::create(
     &mut builder,
     &msg::CompilationResArgs {
       filename: Some(filename),
       done: match source_map.as_str() {
-       "{\"count\":10}" => true,
+        "{\"count\":10}" => true,
         _ => false,
       },
-      data: Some(data_off),
       ..Default::default()
     },
   );
@@ -372,6 +370,66 @@ fn op_compilation (
     &mut builder,
     msg::BaseArgs {
       inner_type: msg::Any::CompilationRes,
+      inner: Some(inner.as_union_value()),
+      ..Default::default()
+    },
+  ))
+}
+
+fn op_module_filename(
+  _state: &Arc<IsolateState>,
+  base: &msg::Base,
+  _data: &'static mut [u8],
+) -> Box<Op> {
+  let inner = base.inner_as_module_filename().unwrap();
+  let module_specifier = String::from(inner.module_specifier().unwrap());
+  let containing_file = String::from(inner.containing_file().unwrap());
+  debug!("op_module_filename {} {}", module_specifier, containing_file);
+  let mut builder = FlatBufferBuilder::new();
+  let filename = builder.create_string("example.ts");
+
+  let inner = msg::ModuleFilenameRes::create(
+    &mut builder,
+    &msg::ModuleFilenameResArgs {
+      filename: Some(filename),
+      ..Default::default()
+    },
+  );
+  ok_future(serialize_response(
+    base.cmd_id(),
+    &mut builder,
+    msg::BaseArgs {
+      inner_type: msg::Any::ModuleFilenameRes,
+      inner: Some(inner.as_union_value()),
+      ..Default::default()
+    },
+  ))
+}
+
+fn op_module_source_fetch(
+  _state: &Arc<IsolateState>,
+  base: &msg::Base,
+  _data: &'static mut [u8],
+) -> Box<Op> {
+  let inner = base.inner_as_module_source_fetch().unwrap();
+  let filename = String::from(inner.filename().unwrap());
+  debug!("op_module_source_fetch {}", filename);
+  let mut builder = FlatBufferBuilder::new();
+  let data_off = builder.create_vector("'source code';".as_bytes());
+
+  let inner = msg::ModuleSourceFetchRes::create(
+    &mut builder,
+    &msg::ModuleSourceFetchResArgs {
+      media_type: msg::MediaType::TypeScript,
+      data: Some(data_off),
+      ..Default::default()
+    },
+  );
+  ok_future(serialize_response(
+    base.cmd_id(),
+    &mut builder,
+    msg::BaseArgs {
+      inner_type: msg::Any::ModuleSourceFetchRes,
       inner: Some(inner.as_union_value()),
       ..Default::default()
     },
@@ -1156,7 +1214,7 @@ fn op_repl_start(
   let history_file = String::from(inner.history_file().unwrap());
 
   debug!("op_repl_start {}", history_file);
-  let history_path = repl::history_path(&state.dir, &history_file);
+  let history_path = repl::history_path(&state.code_provider, &history_file);
   let repl = repl::Repl::new(history_path);
   let resource = resources::add_repl(repl);
 

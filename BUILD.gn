@@ -188,7 +188,7 @@ source_set("snapshot_compiler") {
     "$target_gen_dir/snapshot_deno_compiler.bin",
   ]
   deps = [
-    ":create_snapshot_deno_compiler"
+    ":create_snapshot_deno_compiler",
   ]
 }
 

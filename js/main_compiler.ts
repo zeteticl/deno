@@ -2,14 +2,14 @@
 
 import "./globals"; // imported for side-effects
 
-import * as msg from "gen/msg_generated";
-import { createBuilder } from "./flatbuffers";
+import * as codeProvider from "./code_provider";
+import { Compiler } from "./compiler";
+import { compilerStart, compilation } from "./compiler_ops";
 import * as dispatch from "./dispatch";
 import { libdeno } from "./libdeno";
-import { exit as osExit } from "./os";
+import { exit } from "./os";
 import { promiseErrorExaminer, promiseRejectHandler } from "./promise_util";
-import { assert, log, setLogDebug } from "./util";
-// import { TextEncoder, TextDecoder } from "./text_encoding";
+import { log, setLogDebug } from "./util";
 
 function onGlobalError(
   _message: string,
@@ -23,107 +23,38 @@ function onGlobalError(
   } else {
     console.log(`Thrown: ${String(error)}`);
   }
-  osExit(1);
-}
-
-interface CompilationResponse {
-  done: boolean;
-  filename: string;
-  sourceCode: string;
-}
-
-function getFilenameSource(
-  msg: msg.CompilerStartRes | msg.CompilationRes
-): { filename: string; sourceCode: string } {
-  const dec = new TextDecoder();
-  const filename = msg.filename()!;
-  assert(filename != null);
-  const dataArray = msg.dataArray();
-  assert(dataArray != null);
-  const sourceCode = dec.decode(dataArray!);
-  return { filename, sourceCode };
-}
-
-interface CompilerStartResponse {
-  debugFlag: boolean;
-  next: CompilationResponse;
-  recompileFlag: boolean;
-}
-
-function sendCompilerStart(): CompilerStartResponse {
-  const builder = createBuilder();
-  msg.CompilerStart.startCompilerStart(builder);
-  const startOffset = msg.Start.endStart(builder);
-  const baseRes = dispatch.sendSync(
-    builder,
-    msg.Any.CompilerStart,
-    startOffset
-  );
-  assert(baseRes != null);
-  assert(msg.Any.CompilerStartRes === baseRes!.innerType());
-  const compilerStartRes = new msg.CompilerStartRes();
-  assert(baseRes!.inner(compilerStartRes) != null);
-  const recompileFlag = compilerStartRes.recompileFlag();
-  const debugFlag = compilerStartRes.debugFlag();
-  const { filename, sourceCode } = getFilenameSource(compilerStartRes);
-  return {
-    debugFlag,
-    next: {
-      done: false,
-      filename,
-      sourceCode
-    },
-    recompileFlag
-  };
-}
-
-async function compilation(
-  outputCode: string,
-  sourceMap: string
-): Promise<CompilationResponse> {
-  log("compilation:", outputCode.length, sourceMap.length);
-  const builder = createBuilder();
-  const enc = new TextEncoder();
-  const data = enc.encode(outputCode);
-  const sourceMap_ = builder.createString(sourceMap);
-  msg.Compilation.startCompilation(builder);
-  msg.Compilation.addSourceMap(builder, sourceMap_);
-  const inner = msg.Compilation.endCompilation(builder);
-  const baseRes = await dispatch.sendAsync(
-    builder,
-    msg.Any.Compilation,
-    inner,
-    data
-  );
-  assert(msg.Any.CompilationRes === baseRes.innerType());
-  const compilationRes = new msg.CompilationRes();
-  assert(baseRes!.inner(compilationRes) != null);
-  const done = compilationRes.done();
-  const { filename, sourceCode } = getFilenameSource(compilationRes);
-  return { done, filename, sourceCode };
+  exit(1);
 }
 
 /* tslint:disable-next-line:no-default-export */
-export default async function compilerMain() {
+export default function compilerMain() {
   libdeno.recv(dispatch.handleAsyncMsgFromRust);
   libdeno.setGlobalErrorHandler(onGlobalError);
   libdeno.setPromiseRejectHandler(promiseRejectHandler);
   libdeno.setPromiseErrorExaminer(promiseErrorExaminer);
 
-  let done = false;
-  const startResponse = sendCompilerStart();
-  const { debugFlag } = startResponse;
+  // Create the compiler, and signal it is ready
+  const compiler = new Compiler(codeProvider);
+  const startResponse = compilerStart();
+  const { debugFlag, typesFlag } = startResponse;
   setLogDebug(debugFlag);
+
+  // handle `--types`
+  if (typesFlag) {
+    log("--types");
+    const defaultLibFileName = compiler.getDefaultLibFileName();
+    console.log(compiler.readFile(defaultLibFileName));
+    exit(0);
+  }
+
+  let done = false;
   let { next } = startResponse;
-  let count = 0;
 
   while (!done) {
-    const { filename, sourceCode } = next;
-    console.log("compile: ", filename);
-    console.log(sourceCode);
-    count++;
-    next = await compilation("'outputCode';", `{"count":${count}}`);
+    const { filename } = next;
+    const { outputCode, sourceMap } = compiler.compile(filename);
+    next = compilation(outputCode, sourceMap);
     done = next.done;
   }
-  console.log("done");
+  log("compiler done");
 }
