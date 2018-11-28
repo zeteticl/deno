@@ -96,7 +96,7 @@ pub fn dispatch(
       msg::Any::MakeTempDir => op_make_temp_dir,
       msg::Any::Metrics => op_metrics,
       msg::Any::Mkdir => op_mkdir,
-      // msg::Any::ModuleCodeFetch => op_module_code_fetch,
+      msg::Any::ModuleCodeFetch => op_module_code_fetch,
       msg::Any::ModuleFilename => op_module_filename,
       msg::Any::ModuleSourceFetch => op_module_source_fetch,
       msg::Any::Open => op_open,
@@ -376,6 +376,37 @@ fn op_compilation(
   ))
 }
 
+fn op_module_code_fetch(
+  state: &Arc<IsolateState>,
+  base: &msg::Base,
+  _data: &'static mut [u8],
+) -> Box<Op> {
+  let inner = base.inner_as_module_code_fetch().unwrap();
+  let filename = inner.filename().unwrap();
+  let cmd_id = base.cmd_id();
+  debug!("op_module_code_fetch {}", filename);
+  
+  Box::new(futures::future::result(|| -> OpResult {
+    let builder = &mut FlatBufferBuilder::new();
+    let out = state.code_provider.code_fetch(filename)?;
+    let data_off = builder.create_vector(out);
+    let msg_args = msg::ModuleCodeFetchResArgs {
+      data: Some(data_off),
+      ..Default::default()
+    };
+    let inner = msg::ModuleCodeFetchRes::create(builder, &msg_args);
+    Ok(serialize_response(
+      cmd_id,
+      builder,
+      msg::BaseArgs {
+        inner: Some(inner.as_union_value()),
+        inner_type: msg::Any::CodeFetchRes,
+        ..Default::default()
+      },
+    ))
+  }()))
+}
+
 fn op_module_filename(
   _state: &Arc<IsolateState>,
   base: &msg::Base,
@@ -384,7 +415,10 @@ fn op_module_filename(
   let inner = base.inner_as_module_filename().unwrap();
   let module_specifier = String::from(inner.module_specifier().unwrap());
   let containing_file = String::from(inner.containing_file().unwrap());
-  debug!("op_module_filename {} {}", module_specifier, containing_file);
+  debug!(
+    "op_module_filename {} {}",
+    module_specifier, containing_file
+  );
   let mut builder = FlatBufferBuilder::new();
   let filename = builder.create_string("example.ts");
 

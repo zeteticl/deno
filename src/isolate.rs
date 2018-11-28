@@ -62,7 +62,7 @@ pub struct IsolateState<'a> {
   pub metrics: Mutex<Metrics>,
 }
 
-impl <'a> IsolateState<'a> {
+impl<'a> IsolateState<'a> {
   // Thread safe.
   fn send_to_js(&self, req_id: i32, buf: Buf) {
     let mut g = self.tx.lock().unwrap();
@@ -130,7 +130,7 @@ fn empty() -> libdeno::deno_buf {
   }
 }
 
-impl <'a> Isolate<'a> {
+impl<'a> Isolate<'a> {
   pub fn new(
     snapshot: libdeno::deno_buf,
     flags: flags::DenoFlags,
@@ -273,7 +273,7 @@ impl <'a> Isolate<'a> {
   }
 }
 
-impl <'a> Drop for Isolate<'a> {
+impl<'a> Drop for Isolate<'a> {
   fn drop(&mut self) {
     unsafe { libdeno::deno_delete(self.libdeno_isolate) }
   }

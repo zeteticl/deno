@@ -115,7 +115,7 @@ fn main() {
     flags,
     rest_argv,
     ops::dispatch,
-    &cp
+    &cp,
   );
   tokio_util::init(|| {
     compiler_isolate
@@ -132,7 +132,7 @@ fn main() {
     flags,
     rest_argv_copy,
     ops::dispatch,
-    &cp
+    &cp,
   );
   tokio_util::init(|| {
     deno_isolate
